@@ -1,0 +1,88 @@
+[project]
+name = "vidbrief"
+version = "0.1.0"
+description = "Paste a YouTube link and get a concise AI-generated summary in your language."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "mbarboss" }]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.142.0",
+    "groq>=1.7.0",
+    "jinja2>=3.1.6",
+    "markdown-it-py>=4.2.0",
+    "nh3>=0.3.7",
+    "pydantic-settings>=2.15.0",
+    "python-multipart>=0.0.32",
+    "sse-starlette>=3.5.0",
+    "tenacity>=9.1.4",
+    "uvicorn[standard]>=0.54.0",
+    "yt-dlp[default]>=2026.8.19",
+]
+
+[project.urls]
+Repository = "https://github.com/mbarboss/vidbrief"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W", "F", "I", "N", "UP", "B", "S", "SIM", "C4",
+  "RET", "PTH", "RUF", "ASYNC", "PT",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S104", "S105", "S106"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["vidbrief"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["yt_dlp.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+  "-m", "not integration",
+  "--cov=vidbrief",
+  "--cov-report=term-missing",
+  "--cov-fail-under=85",
+]
+markers = ["integration: tests that hit real external services (network, Groq API)"]
+
+[tool.coverage.run]
+branch = true
+source = ["vidbrief"]
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.3.1",
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.16.0",
+    "ruff>=0.16.9",
+]

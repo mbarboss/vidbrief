@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environment
+.venv/
+
+# Tooling caches and reports
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.audit-requirements.txt
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Runtime media artifacts
+tmp/
+*.m4a
+*.opus
+*.mp3
+*.webm
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
