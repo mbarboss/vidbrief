@@ -47,3 +47,25 @@ class AudioProvider(Protocol):
             VideoUnavailableError: If the video cannot be accessed.
             ExternalServiceError: If YouTube refuses or fails the download.
         """
+
+
+class Transcriber(Protocol):
+    """Turns a video's audio chunks into a transcript with speech-to-text."""
+
+    def transcribe(
+        self, video_id: VideoId, chunks: Sequence[AudioChunk], language: str | None
+    ) -> Transcript:
+        """Return the transcript of ``chunks``, joined in playback order.
+
+        Args:
+            video_id: The video the audio belongs to.
+            chunks: Audio files that must stay readable for the whole call.
+            language: The spoken language as a BCP 47 tag, if known; it only improves
+                accuracy, so unusable values are ignored.
+
+        Raises:
+            NoSpeechDetectedError: If nothing is said in the audio.
+            TranscriptionRateLimitedError: If the speech-to-text quota is exhausted.
+            AudioProcessingError: If a chunk cannot be read.
+            ExternalServiceError: If the speech-to-text service fails or rejects the audio.
+        """
