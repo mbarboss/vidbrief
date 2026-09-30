@@ -1,0 +1,2 @@
+# Git on Windows must not rewrite line endings, or formatters and hashes see false diffs.
+* text=auto eol=lf
