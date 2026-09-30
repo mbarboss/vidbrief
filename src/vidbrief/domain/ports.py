@@ -11,6 +11,7 @@ from vidbrief.domain.models import (
     Transcript,
     VideoMetadata,
 )
+from vidbrief.domain.progress import ProgressCallback, ignore_progress
 from vidbrief.domain.video import VideoId
 
 
@@ -59,7 +60,11 @@ class Transcriber(Protocol):
     """Turns a video's audio chunks into a transcript with speech-to-text."""
 
     def transcribe(
-        self, video_id: VideoId, chunks: Sequence[AudioChunk], language: str | None
+        self,
+        video_id: VideoId,
+        chunks: Sequence[AudioChunk],
+        language: str | None,
+        on_progress: ProgressCallback = ignore_progress,
     ) -> Transcript:
         """Return the transcript of ``chunks``, joined in playback order.
 
@@ -68,6 +73,7 @@ class Transcriber(Protocol):
             chunks: Audio files that must stay readable for the whole call.
             language: The spoken language as a BCP 47 tag, if known; it only improves
                 accuracy, so unusable values are ignored.
+            on_progress: Receives a ``TRANSCRIBING`` step before each chunk is sent.
 
         Raises:
             NoSpeechDetectedError: If nothing is said in the audio.
@@ -80,12 +86,19 @@ class Transcriber(Protocol):
 class Summarizer(Protocol):
     """Writes a summary of a transcript with an LLM."""
 
-    def summarize(self, transcript: Transcript, language: str) -> Summary:
+    def summarize(
+        self,
+        transcript: Transcript,
+        language: str,
+        on_progress: ProgressCallback = ignore_progress,
+    ) -> Summary:
         """Return a TL;DR and key points of ``transcript`` written in ``language``.
 
         Args:
             transcript: Untrusted text; it is only ever passed to the LLM as data.
             language: A code from ``SUPPORTED_SUMMARY_LANGUAGES``.
+            on_progress: Receives a ``SUMMARIZING`` step, with an estimated total, before
+                each LLM request.
 
         Raises:
             UnsupportedLanguageError: If ``language`` is not in the allowlist.

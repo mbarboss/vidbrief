@@ -21,6 +21,7 @@ from vidbrief.domain.errors import (
 )
 from vidbrief.domain.models import AudioChunk, TranscriptSource
 from vidbrief.domain.ports import Transcriber
+from vidbrief.domain.progress import PipelineStage, Progress
 from vidbrief.domain.video import VideoId
 
 VIDEO_ID = VideoId("jNQXAC9IVRw")
@@ -143,6 +144,22 @@ class TestSuccessfulTranscription:
         transcript = harness.transcriber.transcribe(VIDEO_ID, _chunks(tmp_path, 3), None)
 
         assert transcript.text == "first third"
+
+
+class TestProgress:
+    def test_reports_each_chunk_before_sending_it(self, tmp_path: Path) -> None:
+        events: list[Progress] = []
+        harness = Harness("one", "two", "three")
+
+        def record(progress: Progress) -> None:
+            events.append(progress)
+            assert len(harness.endpoint.calls) == len(events) - 1
+
+        harness.transcriber.transcribe(VIDEO_ID, _chunks(tmp_path, 3), None, on_progress=record)
+
+        assert events == [
+            Progress(PipelineStage.TRANSCRIBING, step=step, total=3) for step in (1, 2, 3)
+        ]
 
 
 class TestContinuityPrompt:

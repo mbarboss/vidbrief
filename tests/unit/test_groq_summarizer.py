@@ -23,6 +23,7 @@ from vidbrief.domain.errors import (
 )
 from vidbrief.domain.models import Transcript, TranscriptSource
 from vidbrief.domain.ports import Summarizer
+from vidbrief.domain.progress import PipelineStage, Progress
 from vidbrief.domain.video import VideoId
 
 VIDEO_ID = VideoId("jNQXAC9IVRw")
@@ -322,6 +323,48 @@ class TestLongTranscript:
             _summarizer(FakeCompleter(respond)).summarize(_transcript(_long_text(20_000)), "en")
 
         assert caught.value.reason == "summary_too_long"
+
+
+class TestProgress:
+    def test_a_short_transcript_is_one_step(self) -> None:
+        events: list[Progress] = []
+
+        _summarizer(FakeCompleter()).summarize(
+            _transcript("Text."), "en", on_progress=events.append
+        )
+
+        assert events == [Progress(PipelineStage.SUMMARIZING, step=1, total=1)]
+
+    def test_reports_every_request_with_an_estimated_total(self) -> None:
+        events: list[Progress] = []
+        completer = FakeCompleter()
+
+        def record(progress: Progress) -> None:
+            events.append(progress)
+            assert len(completer.calls) == len(events) - 1
+
+        _summarizer(completer).summarize(_transcript(_long_text(12_000)), "en", on_progress=record)
+
+        assert all(event.stage is PipelineStage.SUMMARIZING for event in events)
+        assert [event.step for event in events] == list(range(1, len(completer.calls) + 1))
+        assert all(
+            event.total is not None and event.step is not None and event.total >= event.step
+            for event in events
+        )
+        assert events[0].total == len(completer.calls)
+        assert events[-1].total == len(completer.calls)
+
+    def test_the_estimate_shrinks_when_a_larger_limit_is_learned(self) -> None:
+        events: list[Progress] = []
+
+        _summarizer(FakeCompleter(_with_limit(250_000))).summarize(
+            _transcript(_long_text(20_000)), "en", on_progress=events.append
+        )
+
+        totals = [event.total for event in events]
+        assert totals[0] is not None
+        assert totals[0] > 3
+        assert totals[-1] == 3
 
 
 class TestRequestBudget:
