@@ -135,7 +135,8 @@ vidbrief runs on Linux, macOS and Windows; every change is tested on all three b
 | Windows (winget) | `winget install astral-sh.uv Gyan.FFmpeg DenoLand.Deno` |
 | Windows ([Chocolatey](https://chocolatey.org/)) | `choco install ffmpeg deno`, plus uv with winget or its [installer](https://docs.astral.sh/uv/getting-started/installation/) |
 
-Open a new terminal afterwards so the tools are on your `PATH`.
+Open a new terminal afterwards so the tools are on your `PATH`. vidbrief checks for
+ffmpeg, ffprobe and Deno at startup and names whichever one is missing.
 
 ## Getting started
 

@@ -2,12 +2,12 @@
 
 import logging
 import math
-import shutil
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
+from vidbrief.adapters.programs import find_program
 from vidbrief.domain.errors import AudioProcessingError
 
 logger = logging.getLogger(__name__)
@@ -85,8 +85,8 @@ class FfmpegAudioProcessor:
         timeout_seconds: Maximum run time of each ffmpeg or ffprobe call.
 
     Raises:
-        AudioProcessingError: ``"ffmpeg_not_found"`` if ffmpeg or ffprobe is missing, so a
-            misconfigured installation fails at startup rather than mid-request.
+        MissingDependencyError: If ffmpeg or ffprobe is missing, so a misconfigured
+            installation fails at startup rather than mid-request.
     """
 
     def __init__(
@@ -97,8 +97,8 @@ class FfmpegAudioProcessor:
         runner: CommandRunner = run_command,
         timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
-        self._ffmpeg = ffmpeg_path or _require_binary("ffmpeg")
-        self._ffprobe = ffprobe_path or _require_binary("ffprobe")
+        self._ffmpeg = ffmpeg_path or find_program("ffmpeg")
+        self._ffprobe = ffprobe_path or find_program("ffprobe")
         self._run = runner
         self._timeout_seconds = timeout_seconds
 
@@ -183,13 +183,6 @@ class FfmpegAudioProcessor:
     def _ffmpeg_run(self, *args: str) -> None:
         # "-n" refuses to overwrite: every output path is expected to be new.
         self._run([self._ffmpeg, *_QUIET, "-n", *args], timeout_seconds=self._timeout_seconds)
-
-
-def _require_binary(name: str) -> str:
-    path = shutil.which(name)
-    if path is None:
-        raise AudioProcessingError("ffmpeg_not_found")
-    return path
 
 
 def _file_url(path: Path) -> str:

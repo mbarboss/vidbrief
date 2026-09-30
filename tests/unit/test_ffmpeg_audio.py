@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from vidbrief.adapters.ffmpeg_audio import FfmpegAudioProcessor, run_command
-from vidbrief.domain.errors import AudioProcessingError
+from vidbrief.domain.errors import AudioProcessingError, MissingDependencyError
 
 FFMPEG = "/usr/bin/ffmpeg"
 FFPROBE = "/usr/bin/ffprobe"
@@ -35,17 +35,23 @@ def _processor(runner: FakeRunner) -> FfmpegAudioProcessor:
 
 
 class TestBinaries:
-    def test_fails_fast_when_ffmpeg_is_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr("vidbrief.adapters.ffmpeg_audio.shutil.which", lambda name: None)
+    @pytest.mark.parametrize("missing", ["ffmpeg", "ffprobe"])
+    def test_fails_fast_when_a_binary_is_missing(
+        self, monkeypatch: pytest.MonkeyPatch, missing: str
+    ) -> None:
+        monkeypatch.setattr(
+            "vidbrief.adapters.programs.shutil.which",
+            lambda name: None if name == missing else f"/opt/bin/{name}",
+        )
 
-        with pytest.raises(AudioProcessingError) as exc_info:
+        with pytest.raises(MissingDependencyError) as exc_info:
             FfmpegAudioProcessor()
 
-        assert exc_info.value.reason == "ffmpeg_not_found"
+        assert exc_info.value.tool == missing
 
     def test_resolves_binaries_from_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            "vidbrief.adapters.ffmpeg_audio.shutil.which", lambda name: f"/opt/bin/{name}"
+            "vidbrief.adapters.programs.shutil.which", lambda name: f"/opt/bin/{name}"
         )
         runner = FakeRunner(lambda args: "1.0\n")
 
