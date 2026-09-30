@@ -24,9 +24,39 @@ dependencies = [
 [project.urls]
 Repository = "https://github.com/mbarboss/vidbrief"
 
+[project.scripts]
+vidbrief = "vidbrief.cli:main"
+
 [build-system]
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
+
+# Tasks run the same way on Linux, macOS and Windows: `uv run poe <task>`; `uv run poe`
+# lists them.
+[tool.poe.tasks]
+install.help = "Install dependencies and git hooks"
+install.sequence = ["uv sync", "uv run pre-commit install"]
+install.default_item_type = "cmd"
+
+format.help = "Auto-format and apply safe lint fixes"
+format.sequence = ["ruff format .", "ruff check --fix ."]
+format.default_item_type = "cmd"
+
+lint.help = "Lint and verify formatting"
+lint.sequence = ["ruff check .", "ruff format --check ."]
+lint.default_item_type = "cmd"
+
+typecheck.help = "Static type checking (strict)"
+typecheck.cmd = "mypy src tests scripts"
+
+test.help = "Run unit tests with coverage"
+test.cmd = "pytest"
+
+audit.help = "Scan dependencies for known vulnerabilities"
+audit.cmd = "python scripts/audit_dependencies.py"
+
+check.help = "Run every quality gate"
+check.sequence = ["lint", "typecheck", "test", "audit"]
 
 [tool.ruff]
 line-length = 100
@@ -80,6 +110,7 @@ exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
 dev = [
     "httpx>=0.28.1",
     "mypy>=2.3.1",
+    "poethepoet>=0.48.0",
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",

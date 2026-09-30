@@ -57,10 +57,11 @@ class TestJsonFormat:
         assert record["reason"] == "host_not_allowed"
 
     def test_serializes_non_json_extras_as_strings(self, stream: io.StringIO) -> None:
-        logger.info("saved", extra={"path": Path("audio/chunk.mp3")})
+        path = Path("audio/chunk.mp3")
+        logger.info("saved", extra={"path": path})
 
         [record] = _records(stream)
-        assert record["path"] == "audio/chunk.mp3"
+        assert record["path"] == str(path)
 
     def test_includes_exception_traceback(self, stream: io.StringIO) -> None:
         try:
