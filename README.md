@@ -134,6 +134,22 @@ cp .env.example .env && chmod 600 .env
 # Edit .env and set GROQ_API_KEY
 ```
 
+### Command line
+
+Until the web interface is ready, videos can be summarized from the terminal:
+
+```bash
+uv run python -m vidbrief "https://youtu.be/jNQXAC9IVRw" --language pt-BR
+uv run python -m vidbrief "https://youtu.be/jNQXAC9IVRw" > summary.md   # save to a file
+```
+
+Progress is shown on stderr (for example `Transcribing the audio (2/5)...` or
+`Summarizing (3/~9)...`, where `~` marks an estimate) and the summary is printed to stdout
+as Markdown. `--language` accepts the allowlisted codes (default:
+`VIDBRIEF_DEFAULT_SUMMARY_LANGUAGE`) and `--verbose` shows JSON logs at
+`VIDBRIEF_LOG_LEVEL`. The exit status is 0 on success, 1 when the video cannot be
+summarized, 2 for invalid arguments or configuration and 130 when cancelled with Ctrl+C.
+
 ## Configuration
 
 All settings are read from environment variables or `.env`. See [`.env.example`](.env.example).
@@ -182,7 +198,10 @@ quota and a few hundred chat tokens.
   they are sent between delimiter tags (forged tags are removed) under rules that forbid
   following instructions found in them, the model has no tools, its answer must match a
   strict JSON schema, and the summary language comes only from the allowlist.
-- LLM output is sanitized before rendering (XSS protection).
+- LLM output is sanitized before rendering (XSS protection). In the Markdown report, the
+  video title and the summary are flattened to single lines, stripped of control and
+  bidirectional characters and escaped, so they cannot inject links, HTML or terminal
+  escape sequences.
 
 ## Legal notice
 

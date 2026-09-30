@@ -16,6 +16,7 @@ from vidbrief.domain.errors import (
     NoSpeechDetectedError,
 )
 from vidbrief.domain.models import AudioChunk, Transcript, TranscriptSource
+from vidbrief.domain.progress import PipelineStage, Progress, ProgressCallback, ignore_progress
 from vidbrief.domain.video import VideoId
 
 logger = logging.getLogger(__name__)
@@ -82,12 +83,17 @@ class GroqTranscriber:
         return self._model
 
     def transcribe(
-        self, video_id: VideoId, chunks: Sequence[AudioChunk], language: str | None
+        self,
+        video_id: VideoId,
+        chunks: Sequence[AudioChunk],
+        language: str | None,
+        on_progress: ProgressCallback = ignore_progress,
     ) -> Transcript:
         """Return the transcript of ``chunks``, joined in playback order.
 
         The end of the text transcribed so far is sent as Whisper's prompt so words and
-        style carry over the cut between chunks.
+        style carry over the cut between chunks. ``on_progress`` receives a
+        ``TRANSCRIBING`` step before each chunk is sent.
 
         Raises:
             NoSpeechDetectedError: If nothing is said in the audio.
@@ -97,7 +103,9 @@ class GroqTranscriber:
         """
         whisper_language = _whisper_language(language)
         parts: list[str] = []
-        for chunk in sorted(chunks, key=lambda chunk: chunk.index):
+        ordered = sorted(chunks, key=lambda chunk: chunk.index)
+        for step, chunk in enumerate(ordered, start=1):
+            on_progress(Progress(PipelineStage.TRANSCRIBING, step=step, total=len(ordered)))
             text = self._transcribe_chunk(chunk, whisper_language, _prompt_tail(" ".join(parts)))
             if text:
                 parts.append(text)

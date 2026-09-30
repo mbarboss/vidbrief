@@ -2,6 +2,7 @@
 
 import json
 import logging
+import math
 import re
 import time
 from collections.abc import Callable
@@ -15,6 +16,7 @@ from vidbrief.config import Settings
 from vidbrief.domain.errors import ExternalServiceError, NoSpeechDetectedError
 from vidbrief.domain.languages import summary_language_name
 from vidbrief.domain.models import Summary, Transcript
+from vidbrief.domain.progress import PipelineStage, Progress, ProgressCallback, ignore_progress
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,19 @@ class _Material:
 
 _TRANSCRIPT = _Material("transcript", "a transcript of the video")
 _NOTES = _Material("notes", "notes taken from the video's transcript")
+
+
+class _StepCounter:
+    """Numbers the requests of one summary and reports them with an estimated total."""
+
+    def __init__(self, on_progress: ProgressCallback) -> None:
+        self._on_progress = on_progress
+        self._step = 0
+
+    def next(self, pending_after: int) -> None:
+        self._step += 1
+        total = self._step + pending_after
+        self._on_progress(Progress(PipelineStage.SUMMARIZING, step=self._step, total=total))
 
 
 class GroqSummarizer:
@@ -100,11 +115,18 @@ class GroqSummarizer:
         """The current token budget for one request, prompt plus completion."""
         return self._budget
 
-    def summarize(self, transcript: Transcript, language: str) -> Summary:
+    def summarize(
+        self,
+        transcript: Transcript,
+        language: str,
+        on_progress: ProgressCallback = ignore_progress,
+    ) -> Summary:
         """Return a TL;DR and key points of ``transcript`` written in ``language``.
 
         The transcript is only ever sent as delimited data, with forged delimiters removed,
-        under rules that forbid following instructions found in it.
+        under rules that forbid following instructions found in it. ``on_progress``
+        receives a ``SUMMARIZING`` step before each request; its total is re-estimated
+        every time, since chunk sizes follow the token limit learned along the way.
 
         Raises:
             UnsupportedLanguageError: If ``language`` is not in the allowlist.
@@ -118,12 +140,15 @@ class GroqSummarizer:
         if not text:
             raise NoSpeechDetectedError("no_speech")
 
+        steps = _StepCounter(on_progress)
         if self._fits_final(language_name, _TRANSCRIPT, text):
             material, content = _TRANSCRIPT, text
         else:
-            notes = self._write_notes(_notes_system(language_name), _TRANSCRIPT, text, "map")
-            material, content = _NOTES, self._condense_until_it_fits(language_name, notes)
+            system = _notes_system(language_name)
+            notes = self._write_notes(system, _TRANSCRIPT, text, "map", steps)
+            material, content = _NOTES, self._condense_until_it_fits(language_name, notes, steps)
 
+        steps.next(pending_after=0)
         system = _final_system(language_name, material)
         reply = self._request(system, material, content, final=True, phase="final")
         if reply.truncated:
@@ -133,7 +158,9 @@ class GroqSummarizer:
             video_id=transcript.video_id, language=language, tldr=tldr, key_points=key_points
         )
 
-    def _condense_until_it_fits(self, language_name: str, notes: list[str]) -> str:
+    def _condense_until_it_fits(
+        self, language_name: str, notes: list[str], steps: _StepCounter
+    ) -> str:
         content = "\n\n".join(notes)
         for round_number in range(_MAX_CONDENSE_ROUNDS + 1):
             if self._fits_final(language_name, _NOTES, content):
@@ -141,20 +168,32 @@ class GroqSummarizer:
             if round_number == _MAX_CONDENSE_ROUNDS:
                 break
             condensed = "\n\n".join(
-                self._write_notes(_condense_system(language_name), _NOTES, content, "condense")
+                self._write_notes(
+                    _condense_system(language_name), _NOTES, content, "condense", steps
+                )
             )
             if estimate_tokens(condensed) >= estimate_tokens(content):
                 break
             content = condensed
         raise ExternalServiceError("summary_too_long")
 
-    def _write_notes(self, system: str, material: _Material, content: str, phase: str) -> list[str]:
+    def _write_notes(
+        self,
+        system: str,
+        material: _Material,
+        content: str,
+        phase: str,
+        steps: _StepCounter,
+    ) -> list[str]:
         notes: list[str] = []
         remaining = content
         while remaining:
             # The room is recomputed for every piece because a response may reveal a larger
             # (or smaller) token limit than the one assumed so far.
-            piece, remaining = split_off(remaining, self._input_room(system, material, final=False))
+            room = self._input_room(system, material, final=False)
+            piece, remaining = split_off(remaining, room)
+            # The pieces still to write plus the final request.
+            steps.next(pending_after=math.ceil(estimate_tokens(remaining) / room) + 1)
             note = self._notes(system, material, piece, phase=phase)
             if note:
                 notes.append(note)
