@@ -58,7 +58,9 @@ class TestCommands:
     def test_normalize_builds_a_locked_down_command(self) -> None:
         runner = FakeRunner()
 
-        _processor(runner).normalize(Path("/work/id.source.webm"), Path("/work/id.ogg"))
+        source, destination = Path("/work/id.source.webm"), Path("/work/id.ogg")
+
+        _processor(runner).normalize(source, destination)
 
         [(args, timeout)] = runner.calls
         assert timeout == 42.0
@@ -72,7 +74,7 @@ class TestCommands:
             "-protocol_whitelist",
             "file",
             "-i",
-            "file:/work/id.source.webm",
+            f"file:{source}",
             "-map",
             "0:a:0",
             "-vn",
@@ -90,19 +92,22 @@ class TestCommands:
             "24k",
             "-application",
             "voip",
-            "file:/work/id.ogg",
+            f"file:{destination}",
         ]
 
     def test_probe_duration_reads_the_container_duration(self) -> None:
         runner = FakeRunner(lambda args: "213.056625\n")
 
-        duration = _processor(runner).probe_duration(Path("/work/id.ogg"))
+        path = Path("/work/id.ogg")
+
+        duration = _processor(runner).probe_duration(path)
 
         assert duration == pytest.approx(213.056625)
         [(args, _)] = runner.calls
         assert args[0] == FFPROBE
         assert args[args.index("-protocol_whitelist") + 1] == "file"
-        assert args[-1] == "file:/work/id.ogg"
+        # The OS path separator is kept: real ffmpeg accepts it on every platform.
+        assert args[-1] == f"file:{path}"
 
     @pytest.mark.parametrize("output", ["N/A\n", "", "0\n", "-3\n", "nan\n", "inf\n"])
     def test_probe_duration_rejects_unusable_values(self, output: str) -> None:
