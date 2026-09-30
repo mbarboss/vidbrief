@@ -38,6 +38,15 @@ extra parameters such as `t=`, `list=` or `si=` are ignored.
 Accepted hosts: `youtube.com`, `www.youtube.com`, `m.youtube.com`, `youtu.be` and
 `www.youtube-nocookie.com`. Playlists and channel pages are not supported.
 
+### Videos that cannot be summarized
+
+- Live streams that are in progress, scheduled or still being processed (finished streams
+  work normally).
+- Private, removed, region-blocked, age-restricted or members-only videos. vidbrief never
+  uses your YouTube/Google login cookies, so restricted content stays out of reach by design.
+- Videos longer than `VIDBRIEF_MAX_VIDEO_DURATION_SECONDS` (2 hours by default), or whose
+  length YouTube does not report.
+
 ## Tech stack
 
 | Layer | Technology |
