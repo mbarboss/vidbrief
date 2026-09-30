@@ -22,6 +22,22 @@ YouTube URL ─► validate ─► captions? ──yes────────�
                               no ─► download audio ─► transcribe ─► summarize ─► result
 ```
 
+## Supported links
+
+Only video links on YouTube's own hosts are accepted; the `https://` prefix is optional and
+extra parameters such as `t=`, `list=` or `si=` are ignored.
+
+| Format | Example |
+|---|---|
+| Watch page | `https://www.youtube.com/watch?v=dQw4w9WgXcQ` |
+| Short link | `https://youtu.be/dQw4w9WgXcQ` |
+| Shorts | `https://www.youtube.com/shorts/dQw4w9WgXcQ` |
+| Live | `https://www.youtube.com/live/dQw4w9WgXcQ` |
+| Embed | `https://www.youtube.com/embed/dQw4w9WgXcQ` |
+
+Accepted hosts: `youtube.com`, `www.youtube.com`, `m.youtube.com`, `youtu.be` and
+`www.youtube-nocookie.com`. Playlists and channel pages are not supported.
+
 ## Tech stack
 
 | Layer | Technology |
@@ -82,8 +98,12 @@ Integration tests hit real services and are skipped by default: `uv run pytest -
 ## Security
 
 - Runs locally only: the server refuses to bind to non-loopback addresses.
-- Secrets are loaded from `.env` (git-ignored) and never logged.
-- Only YouTube URLs are accepted (SSRF protection).
+- Secrets are loaded from `.env` (git-ignored) and never logged: logs are structured JSON
+  on stderr, and Groq API keys are masked as `[REDACTED]` in messages, extra fields and
+  tracebacks.
+- Only YouTube URLs are accepted (SSRF protection): links with credentials, custom ports, IP
+  addresses or non-HTTP schemes are rejected, and downstream tools only ever receive a
+  canonical URL rebuilt from the validated video ID.
 - Transcripts are treated as untrusted data in LLM prompts (prompt-injection mitigation).
 - LLM output is sanitized before rendering (XSS protection).
 
