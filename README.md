@@ -35,12 +35,18 @@ audio when none fits:
 
 Machine-translated automatic captions are never used; the summarizer translates from the
 original text instead. Sound-only cues such as `[Music]` or `[Applause]` are dropped.
+Captions longer than the video could plausibly hold (more than 40 characters per second)
+are ignored and the audio is transcribed instead, so a crafted caption file cannot turn
+one summary into thousands of billed requests.
 
 ### Audio fallback
 
 Without usable captions, vidbrief downloads only the audio stream (never the video) and
 converts it to 24 kbps mono Opus, which keeps speech clear for Whisper at about 10 MB per
-hour. Longer recordings are split by time into chunks under `VIDBRIEF_AUDIO_CHUNK_MAX_MB`.
+hour. Recordings larger than `VIDBRIEF_AUDIO_CHUNK_MAX_MB` are split by time into chunks;
+with the defaults (24 MB, videos up to 2 hours) the whole audio always fits in one
+request, and splitting only kicks in if you lower the chunk size or raise the duration
+limit.
 All files live in a temporary folder that is deleted as soon as the job ends, even when
 it fails.
 
@@ -79,8 +85,11 @@ longest answer a request allows. vidbrief therefore sizes every request to that 
   so paid plans automatically get fewer, larger requests. To pin the size instead, set
   `VIDBRIEF_SUMMARY_MAX_REQUEST_TOKENS`.
 
-On the free tier (8,000 tokens per minute), a 2-hour video needs about one request per
-minute, so its summary takes around 8 to 10 minutes; on a paid plan it takes seconds.
+Measured on the free tier: a 57-minute lecture with captions was summarized in 74 seconds
+(six requests, including four short waits for the per-minute token limit), and a
+13-minute talk without usable captions took 15 seconds end to end (download and
+conversion 10 s, Whisper 3 s, summary 1 s). Expect roughly one to two minutes per hour of
+captioned video; paid plans are faster.
 
 ## Supported links
 
@@ -210,8 +219,8 @@ quota and a few hundred chat tokens.
 
 - Runs locally only: the server refuses to bind to non-loopback addresses.
 - Secrets are loaded from `.env` (git-ignored) and never logged: logs are structured JSON
-  on stderr, and Groq API keys are masked as `[REDACTED]` in messages, extra fields and
-  tracebacks.
+  on stderr, and Groq API keys are masked as `[REDACTED]` in messages, extra fields
+  (including values nested in objects) and tracebacks.
 - Only YouTube URLs are accepted (SSRF protection): links with credentials, custom ports, IP
   addresses or non-HTTP schemes are rejected, and downstream tools only ever receive a
   canonical URL rebuilt from the validated video ID.
