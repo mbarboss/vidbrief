@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 
 from vidbrief.domain.video import VideoId
 
@@ -80,3 +81,15 @@ class Transcript:
     language: str | None
     source: TranscriptSource
     text: str
+
+
+@dataclass(frozen=True, slots=True)
+class AudioChunk:
+    """One piece of a video's audio, small enough for a single transcription request.
+
+    ``index`` gives the playback order; ``path`` is only valid while the audio provider's
+    context is open.
+    """
+
+    index: int
+    path: Path

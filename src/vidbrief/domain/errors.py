@@ -70,6 +70,12 @@ class CaptionsUnavailableError(VidbriefError):
     _user_message = "Captions for this video could not be retrieved."
 
 
+class AudioProcessingError(VidbriefError):
+    """Raised when the audio cannot be downloaded, converted or split for transcription."""
+
+    _user_message = "We couldn't process this video's audio."
+
+
 class ExternalServiceError(VidbriefError):
     """Raised when a third-party service fails or returns something unexpected."""
 

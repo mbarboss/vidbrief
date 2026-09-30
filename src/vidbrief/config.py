@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, ge=1024, le=65535)
     log_level: LogLevel = "INFO"
 
+    @property
+    def audio_chunk_max_bytes(self) -> int:
+        """The audio chunk limit in bytes."""
+        # Decimal megabytes are the smaller reading of "MB", so the limit holds whichever
+        # unit the provider actually enforces.
+        return self.audio_chunk_max_mb * 1_000_000
+
     @field_validator("groq_api_key")
     @classmethod
     def _reject_blank_api_key(cls, value: SecretStr) -> SecretStr:
