@@ -42,6 +42,22 @@ hour. Longer recordings are split by time into chunks under `VIDBRIEF_AUDIO_CHUN
 All files live in a temporary folder that is deleted as soon as the job ends, even when
 it fails.
 
+### Transcription
+
+The audio chunks are sent one at a time to Groq's Whisper model
+(`VIDBRIEF_TRANSCRIPTION_MODEL`), with the video's spoken language as a hint when YouTube
+reports it. The last words of each chunk are passed along with the next one so sentences
+cut at a chunk boundary stay coherent.
+
+Timeouts, connection errors and server errors are retried up to three times per chunk.
+When Groq's rate limit asks for a wait of up to a minute, vidbrief waits and retries;
+longer waits (for example, when the free tier's hourly audio quota is used up) end the job
+with a "try again later" message instead of blocking it.
+
+On Groq's free tier, speech-to-text is limited to 2 hours of audio per hour and 8 hours
+per day, so only a few long videos without captions can be transcribed each day. Videos
+with captions do not use this quota.
+
 ## Supported links
 
 Only video links on YouTube's own hosts are accepted; the `https://` prefix is optional and
@@ -123,6 +139,8 @@ make check      # lint + typecheck + tests + dependency audit
 ```
 
 Integration tests hit real services and are skipped by default: `uv run pytest -m integration`.
+The transcription test needs `GROQ_API_KEY` in `.env` and uses about 20 seconds of the
+Groq audio quota.
 
 ## Security
 
@@ -135,6 +153,8 @@ Integration tests hit real services and are skipped by default: `uv run pytest -
   canonical URL rebuilt from the validated video ID.
 - ffmpeg runs without a shell and may only open local files (`-protocol_whitelist file`), so
   a crafted media file cannot make it fetch URLs.
+- Errors from Groq are reduced to fixed reason codes, so provider messages never reach the
+  UI or the logs, and transcript text is never logged.
 - Transcripts are treated as untrusted data in LLM prompts (prompt-injection mitigation).
 - LLM output is sanitized before rendering (XSS protection).
 

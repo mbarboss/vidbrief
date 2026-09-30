@@ -6,6 +6,8 @@ from vidbrief.domain.errors import (
     ExternalServiceError,
     InvalidVideoUrlError,
     LiveStreamNotSupportedError,
+    NoSpeechDetectedError,
+    TranscriptionRateLimitedError,
     VidbriefError,
     VideoDurationUnknownError,
     VideoTooLongError,
@@ -22,6 +24,8 @@ from vidbrief.domain.errors import (
         VideoDurationUnknownError("missing_duration"),
         ExternalServiceError("network"),
         VideoTooLongError(7200),
+        TranscriptionRateLimitedError("transcription_rate_limited"),
+        NoSpeechDetectedError("no_speech"),
     ],
     ids=type,
 )
@@ -45,3 +49,11 @@ class TestVideoTooLongError:
         error = VideoTooLongError(90)
 
         assert error.user_message == "Videos longer than 90 seconds are not supported."
+
+
+def test_rate_limit_is_an_external_service_failure_with_its_own_message() -> None:
+    error = TranscriptionRateLimitedError("transcription_rate_limited")
+
+    assert isinstance(error, ExternalServiceError)
+    assert error.user_message != ExternalServiceError("network").user_message
+    assert "try again later" in error.user_message
