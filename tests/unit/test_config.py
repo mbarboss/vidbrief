@@ -134,6 +134,11 @@ class TestResourceLimits:
         with pytest.raises(ValidationError):
             make_settings(**{env_var: value})
 
+    def test_audio_chunk_limit_uses_decimal_megabytes(self, make_settings: SettingsFactory) -> None:
+        settings = make_settings(VIDBRIEF_AUDIO_CHUNK_MAX_MB="24")
+
+        assert settings.audio_chunk_max_bytes == 24_000_000
+
 
 class TestGetSettings:
     def test_returns_a_single_cached_instance(self, monkeypatch: pytest.MonkeyPatch) -> None:

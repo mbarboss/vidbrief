@@ -34,6 +34,14 @@ audio when none fits:
 Machine-translated automatic captions are never used; the summarizer translates from the
 original text instead. Sound-only cues such as `[Music]` or `[Applause]` are dropped.
 
+### Audio fallback
+
+Without usable captions, vidbrief downloads only the audio stream (never the video) and
+converts it to 24 kbps mono Opus, which keeps speech clear for Whisper at about 10 MB per
+hour. Longer recordings are split by time into chunks under `VIDBRIEF_AUDIO_CHUNK_MAX_MB`.
+All files live in a temporary folder that is deleted as soon as the job ends, even when
+it fails.
+
 ## Supported links
 
 Only video links on YouTube's own hosts are accepted; the `https://` prefix is optional and
@@ -99,7 +107,7 @@ All settings are read from environment variables or `.env`. See [`.env.example`]
 | `VIDBRIEF_SUMMARY_MODEL` | `openai/gpt-oss-120b` | LLM used for summaries |
 | `VIDBRIEF_DEFAULT_SUMMARY_LANGUAGE` | `pt-BR` | Default summary language (allowlisted) |
 | `VIDBRIEF_MAX_VIDEO_DURATION_SECONDS` | `7200` | Longest video accepted |
-| `VIDBRIEF_AUDIO_CHUNK_MAX_MB` | `24` | Max audio chunk size sent to Groq |
+| `VIDBRIEF_AUDIO_CHUNK_MAX_MB` | `24` | Max audio chunk size sent to Groq, in decimal MB |
 | `VIDBRIEF_REQUEST_TIMEOUT_SECONDS` | `120` | Timeout for external API calls |
 | `VIDBRIEF_MAX_CONCURRENT_JOBS` | `1` | Parallel summarization jobs |
 | `VIDBRIEF_HOST` | `127.0.0.1` | Bind address (loopback only) |
@@ -125,6 +133,8 @@ Integration tests hit real services and are skipped by default: `uv run pytest -
 - Only YouTube URLs are accepted (SSRF protection): links with credentials, custom ports, IP
   addresses or non-HTTP schemes are rejected, and downstream tools only ever receive a
   canonical URL rebuilt from the validated video ID.
+- ffmpeg runs without a shell and may only open local files (`-protocol_whitelist file`), so
+  a crafted media file cannot make it fetch URLs.
 - Transcripts are treated as untrusted data in LLM prompts (prompt-injection mitigation).
 - LLM output is sanitized before rendering (XSS protection).
 

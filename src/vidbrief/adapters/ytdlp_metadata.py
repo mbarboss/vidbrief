@@ -1,20 +1,18 @@
 """Video metadata lookup backed by yt-dlp's Python API."""
 
 import re
-from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlsplit
 
 import yt_dlp
 from yt_dlp.utils import YoutubeDLError
 
-from vidbrief.adapters.ytdlp_common import YoutubeDLFactory, base_options
-from vidbrief.domain.errors import (
-    ExternalServiceError,
-    LiveStreamNotSupportedError,
-    VidbriefError,
-    VideoUnavailableError,
+from vidbrief.adapters.ytdlp_common import (
+    YoutubeDLFactory,
+    base_options,
+    translate_download_error,
 )
+from vidbrief.domain.errors import ExternalServiceError
 from vidbrief.domain.models import ORIGINAL_TRACK_SUFFIX, LiveStatus, VideoMetadata
 from vidbrief.domain.video import VideoId
 
@@ -22,21 +20,6 @@ _THUMBNAIL_HOST = "i.ytimg.com"
 # Loose BCP 47 shape: keeps codes like "en", "pt-BR" or "en-orig" and drops pseudo-tracks
 # such as "live_chat" or anything that could be mistaken for a path.
 _LANGUAGE_CODE_RE = re.compile(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*")
-
-# yt-dlp only reports failures as English prose, so matching known phrases is the only way
-# to tell them apart. Order matters: the first match wins.
-_ERROR_MARKERS: tuple[tuple[str, Callable[[str], VidbriefError], str], ...] = (
-    ("not a bot", ExternalServiceError, "bot_check"),
-    ("private video", VideoUnavailableError, "private"),
-    ("confirm your age", VideoUnavailableError, "age_restricted"),
-    ("members-only", VideoUnavailableError, "members_only"),
-    ("available in your country", VideoUnavailableError, "geo_blocked"),
-    ("has been removed", VideoUnavailableError, "removed"),
-    ("video unavailable", VideoUnavailableError, "unavailable"),
-    ("video is unavailable", VideoUnavailableError, "unavailable"),
-    ("live event will begin", LiveStreamNotSupportedError, "is_upcoming"),
-    ("premieres in", LiveStreamNotSupportedError, "is_upcoming"),
-)
 
 
 class YtDlpMetadataProvider:
@@ -70,19 +53,11 @@ class YtDlpMetadataProvider:
             with self._ydl_factory(base_options(self._socket_timeout_seconds)) as ydl:
                 info = ydl.extract_info(video_id.canonical_url, download=False)
         except YoutubeDLError as error:
-            raise _translate_error(str(error)) from error
+            raise translate_download_error(str(error)) from error
 
         if not isinstance(info, dict) or info.get("id") != video_id.value:
             raise ExternalServiceError("unexpected_response")
         return _to_metadata(video_id, info)
-
-
-def _translate_error(message: str) -> VidbriefError:
-    lowered = message.lower()
-    for marker, error_type, reason in _ERROR_MARKERS:
-        if marker in lowered:
-            return error_type(reason)
-    return ExternalServiceError("download_failed")
 
 
 def _to_metadata(video_id: VideoId, info: dict[str, Any]) -> VideoMetadata:
