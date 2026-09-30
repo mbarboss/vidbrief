@@ -64,6 +64,12 @@ class VideoTooLongError(VidbriefError):
         return f"Videos longer than {_describe_limit(self.max_duration_seconds)} are not supported."
 
 
+class CaptionsUnavailableError(VidbriefError):
+    """Raised when a caption track cannot be turned into a transcript."""
+
+    _user_message = "Captions for this video could not be retrieved."
+
+
 class ExternalServiceError(VidbriefError):
     """Raised when a third-party service fails or returns something unexpected."""
 
