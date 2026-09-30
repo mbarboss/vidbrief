@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     max_video_duration_seconds: int = Field(default=7200, gt=0)
     # Groq's free tier rejects uploads above 25 MB; the margin absorbs container overhead.
     audio_chunk_max_mb: int = Field(default=24, gt=0, le=100)
+    # Unset means the summarizer sizes its requests from the token limit Groq reports; a
+    # value pins the budget (prompt plus completion tokens) for every summary request.
+    summary_max_request_tokens: int | None = Field(default=None, ge=2000, le=131_072)
     request_timeout_seconds: float = Field(default=120.0, gt=0)
     max_concurrent_jobs: int = Field(default=1, ge=1, le=4)
     host: str = "127.0.0.1"
