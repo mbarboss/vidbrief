@@ -94,6 +94,12 @@ class NoSpeechDetectedError(VidbriefError):
     _user_message = "No speech could be detected in this video."
 
 
+class UnsupportedLanguageError(VidbriefError):
+    """Raised when a summary is requested in a language outside the allowlist."""
+
+    _user_message = "Please choose one of the supported summary languages."
+
+
 def _describe_limit(seconds: int) -> str:
     if seconds % 60 == 0:
         return f"{seconds // 60} minutes"

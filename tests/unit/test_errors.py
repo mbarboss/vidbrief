@@ -8,6 +8,7 @@ from vidbrief.domain.errors import (
     LiveStreamNotSupportedError,
     NoSpeechDetectedError,
     RateLimitedError,
+    UnsupportedLanguageError,
     VidbriefError,
     VideoDurationUnknownError,
     VideoTooLongError,
@@ -26,6 +27,7 @@ from vidbrief.domain.errors import (
         VideoTooLongError(7200),
         RateLimitedError("summary_rate_limited"),
         NoSpeechDetectedError("no_speech"),
+        UnsupportedLanguageError("unsupported_language"),
     ],
     ids=type,
 )
