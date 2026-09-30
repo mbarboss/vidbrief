@@ -59,15 +59,16 @@ class FakeMetadataProvider:
 
 
 class FakeCaptionProvider:
-    def __init__(self, error: Exception | None = None) -> None:
+    def __init__(self, error: Exception | None = None, text: str = CAPTION_TEXT) -> None:
         self._error = error
+        self._text = text
         self.calls: list[tuple[VideoId, CaptionTrack]] = []
 
     def fetch_captions(self, video_id: VideoId, track: CaptionTrack) -> Transcript:
         self.calls.append((video_id, track))
         if self._error:
             raise self._error
-        return Transcript(video_id, "en", TranscriptSource.MANUAL_CAPTIONS, CAPTION_TEXT)
+        return Transcript(video_id, "en", TranscriptSource.MANUAL_CAPTIONS, self._text)
 
 
 class FakeAudioProvider:
@@ -141,12 +142,13 @@ class Harness:
         *,
         metadata: VideoMetadata | Exception = METADATA,
         caption_error: Exception | None = None,
+        caption_text: str = CAPTION_TEXT,
         audio_error: Exception | None = None,
         transcriber_error: Exception | None = None,
         summarizer_error: Exception | None = None,
     ) -> None:
         self.metadata = FakeMetadataProvider(metadata)
-        self.captions = FakeCaptionProvider(caption_error)
+        self.captions = FakeCaptionProvider(caption_error, caption_text)
         self.audio = FakeAudioProvider(tmp_path, audio_error)
         self.transcriber = FakeTranscriber(transcriber_error)
         self.summarizer = FakeSummarizer(summarizer_error)
@@ -223,6 +225,27 @@ class TestAudioFallback:
         assert result.transcript_source is TranscriptSource.SPEECH_TO_TEXT
         assert len(harness.captions.calls) == 1
         assert harness.audio.calls == [VIDEO_ID]
+
+    def test_distrusts_captions_longer_than_the_video_could_hold(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.INFO, logger="vidbrief")
+        # METADATA is 19 seconds long, so the one-minute allowance applies.
+        harness = Harness(tmp_path, caption_text="x" * (40 * 60 + 1))
+
+        result = harness.run()
+
+        assert result.transcript_source is TranscriptSource.SPEECH_TO_TEXT
+        assert harness.summarizer.calls[0][0].text == SPEECH_TEXT
+        assert any(getattr(r, "reason", None) == "implausibly_long" for r in caplog.records)
+
+    def test_keeps_long_but_plausible_captions(self, tmp_path: Path) -> None:
+        harness = Harness(tmp_path, caption_text="x" * 40 * 60)
+
+        result = harness.run()
+
+        assert result.transcript_source is TranscriptSource.MANUAL_CAPTIONS
+        assert harness.audio.calls == []
 
     def test_logs_why_it_fell_back(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
         caplog.set_level(logging.INFO, logger="vidbrief")
