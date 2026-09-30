@@ -12,7 +12,7 @@ import pytest
 from vidbrief import cli
 from vidbrief.cli import main
 from vidbrief.config import LogLevel, Settings
-from vidbrief.domain.errors import VideoTooLongError
+from vidbrief.domain.errors import MissingDependencyError, VideoTooLongError
 from vidbrief.domain.models import LiveStatus, Summary, TranscriptSource, VideoMetadata
 from vidbrief.domain.progress import PipelineStage, Progress, ProgressCallback
 from vidbrief.domain.video import VideoId
@@ -146,6 +146,26 @@ def test_pipeline_errors_show_the_safe_message(settings: Settings) -> None:
         "Error: Videos longer than 120 minutes are not supported.\n"
     )
     assert run.stdout.getvalue() == ""
+
+
+def test_missing_programs_are_reported_before_any_work(settings: Settings) -> None:
+    run = Run(settings)
+
+    def build(settings: Settings) -> FakeRunner:
+        raise MissingDependencyError("deno")
+
+    code = main(
+        [URL],
+        load_settings=lambda: settings,
+        build=build,
+        setup_logging=run.logging,
+        stdout=run.stdout,
+        stderr=run.stderr,
+    )
+
+    assert code == 1
+    assert "'deno'" in run.stderr.getvalue()
+    assert run.runner.calls == []
 
 
 def test_ctrl_c_exits_quietly(settings: Settings) -> None:

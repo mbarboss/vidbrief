@@ -2,7 +2,7 @@
 
 import pytest
 
-from vidbrief.domain.eligibility import ensure_summarizable
+from vidbrief.domain.eligibility import ensure_summarizable, is_plausible_transcript
 from vidbrief.domain.errors import (
     LiveStreamNotSupportedError,
     VideoDurationUnknownError,
@@ -57,3 +57,15 @@ def test_rejects_streams_that_have_not_finished(live_status: LiveStatus) -> None
 def test_rejects_a_video_with_unknown_duration() -> None:
     with pytest.raises(VideoDurationUnknownError):
         ensure_summarizable(_metadata(duration_seconds=None), MAX_DURATION)
+
+
+class TestPlausibleTranscript:
+    def test_accepts_up_to_forty_characters_per_second(self) -> None:
+        assert is_plausible_transcript("x" * 40 * 600, duration_seconds=600)
+
+    def test_rejects_text_longer_than_the_video_could_hold(self) -> None:
+        assert not is_plausible_transcript("x" * (40 * 600 + 1), duration_seconds=600)
+
+    def test_gives_very_short_videos_a_minute_of_allowance(self) -> None:
+        assert is_plausible_transcript("x" * 40 * 60, duration_seconds=5)
+        assert not is_plausible_transcript("x" * (40 * 60 + 1), duration_seconds=5)

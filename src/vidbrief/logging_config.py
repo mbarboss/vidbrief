@@ -15,12 +15,15 @@ _HANDLER_NAME = "vidbrief-json"
 # Anything a LogRecord carries by default; every other attribute came from ``extra=``.
 _STANDARD_RECORD_ATTRS = frozenset(vars(logging.makeLogRecord({}))) | {"message", "asctime"}
 _TRACEBACK_FORMATTER = logging.Formatter()
+# Extra values of these types cannot hold a secret and stay native JSON values.
+_JSON_SCALARS = (bool, int, float, type(None))
 
 
 class SecretRedactionFilter(logging.Filter):
     """Replace Groq API keys and the given secret values with ``[REDACTED]``.
 
-    Covers the formatted message, string ``extra`` fields, tracebacks and stack info. It is
+    Covers the formatted message, ``extra`` fields (non-scalar values are rendered as text
+    first), tracebacks and stack info. It is
     attached to the handler rather than a logger so records from every module are covered.
     """
 
@@ -52,8 +55,11 @@ class SecretRedactionFilter(logging.Filter):
             record.stack_info = self.redact(record.stack_info)
 
         for key, value in list(vars(record).items()):
-            if key not in _STANDARD_RECORD_ATTRS and isinstance(value, str):
-                setattr(record, key, self.redact(value))
+            if key in _STANDARD_RECORD_ATTRS or isinstance(value, _JSON_SCALARS):
+                continue
+            # Containers and objects are rendered as text first so a secret nested inside a
+            # dict or an exception is masked too.
+            setattr(record, key, self.redact(value if isinstance(value, str) else str(value)))
         return True
 
 

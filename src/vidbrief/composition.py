@@ -4,6 +4,7 @@ from vidbrief.adapters.ffmpeg_audio import FfmpegAudioProcessor
 from vidbrief.adapters.groq_summarizer import GroqSummarizer
 from vidbrief.adapters.groq_transcriber import GroqTranscriber
 from vidbrief.adapters.local_audio import LocalAudioProvider
+from vidbrief.adapters.programs import find_program
 from vidbrief.adapters.ytdlp_audio import YtDlpAudioDownloader
 from vidbrief.adapters.ytdlp_captions import YtDlpCaptionProvider
 from vidbrief.adapters.ytdlp_metadata import YtDlpMetadataProvider
@@ -19,8 +20,11 @@ def build_pipeline(settings: Settings) -> SummaryPipeline:
     """Create a pipeline backed by yt-dlp, ffmpeg and Groq.
 
     Raises:
-        AudioProcessingError: ``"ffmpeg_not_found"`` if ffmpeg or ffprobe is missing.
+        MissingDependencyError: If Deno, ffmpeg or ffprobe is missing.
     """
+    # yt-dlp finds Deno on its own but, without it, YouTube downloads fail with errors that
+    # look like service outages; checking here names the real cause at startup.
+    find_program("deno")
     return SummaryPipeline(
         metadata_provider=YtDlpMetadataProvider(
             socket_timeout_seconds=_YTDLP_SOCKET_TIMEOUT_SECONDS

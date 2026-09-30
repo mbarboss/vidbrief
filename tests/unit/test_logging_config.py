@@ -63,6 +63,14 @@ class TestJsonFormat:
         [record] = _records(stream)
         assert record["path"] == str(path)
 
+    def test_keeps_numbers_and_booleans_as_json_values(self, stream: io.StringIO) -> None:
+        logger.info("done", extra={"attempt": 2, "elapsed_seconds": 1.5, "truncated": False})
+
+        [record] = _records(stream)
+        assert record["attempt"] == 2
+        assert record["elapsed_seconds"] == 1.5
+        assert record["truncated"] is False
+
     def test_includes_exception_traceback(self, stream: io.StringIO) -> None:
         try:
             raise RuntimeError("boom")
@@ -111,6 +119,18 @@ class TestSecretRedaction:
 
         assert secret not in stream.getvalue()
         assert _records(stream)[0]["detail"] == f"key={REDACTED}"
+
+    def test_redacts_extra_fields_that_are_not_strings(
+        self, stream: io.StringIO, secret: str
+    ) -> None:
+        logger.warning(
+            "request failed",
+            extra={"payload": {"headers": {"authorization": secret}}, "error": ValueError(secret)},
+        )
+
+        output = stream.getvalue()
+        assert secret not in output
+        assert output.count("[REDACTED]") == 2
 
     def test_redacts_exception_traceback(self, stream: io.StringIO, secret: str) -> None:
         try:

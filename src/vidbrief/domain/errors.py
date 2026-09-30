@@ -94,6 +94,26 @@ class NoSpeechDetectedError(VidbriefError):
     _user_message = "No speech could be detected in this video."
 
 
+class MissingDependencyError(VidbriefError):
+    """Raised at startup when a program vidbrief needs is not installed.
+
+    Attributes:
+        tool: The program name, always chosen by vidbrief and never taken from user input.
+    """
+
+    def __init__(self, tool: str) -> None:
+        super().__init__(f"{tool}_not_found")
+        self.tool = tool
+
+    @property
+    def user_message(self) -> str:
+        """A text that is safe to show in the UI and names the missing program."""
+        return (
+            f"The required program '{self.tool}' was not found. Install it and make sure it "
+            "is on your PATH (see the README)."
+        )
+
+
 class UnsupportedLanguageError(VidbriefError):
     """Raised when a summary is requested in a language outside the allowlist."""
 

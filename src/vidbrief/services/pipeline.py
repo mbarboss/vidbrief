@@ -6,10 +6,16 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from vidbrief.domain.captions import select_caption_track
-from vidbrief.domain.eligibility import ensure_summarizable
+from vidbrief.domain.eligibility import ensure_summarizable, is_plausible_transcript
 from vidbrief.domain.errors import CaptionsUnavailableError
 from vidbrief.domain.languages import summary_language_name
-from vidbrief.domain.models import Summary, Transcript, TranscriptSource, VideoMetadata
+from vidbrief.domain.models import (
+    CaptionTrack,
+    Summary,
+    Transcript,
+    TranscriptSource,
+    VideoMetadata,
+)
 from vidbrief.domain.ports import (
     AudioProvider,
     CaptionProvider,
@@ -107,13 +113,22 @@ class SummaryPipeline:
             metadata=metadata, transcript_source=transcript.source, summary=summary
         )
 
+    def _plausible_captions(self, metadata: VideoMetadata, track: CaptionTrack) -> Transcript:
+        transcript = self._caption_provider.fetch_captions(metadata.video_id, track)
+        # Eligibility already guarantees a known duration.
+        duration = metadata.duration_seconds or 0
+        if not is_plausible_transcript(transcript.text, duration):
+            # The audio is bounded by the video's length, so it is the safe source here.
+            raise CaptionsUnavailableError("implausibly_long")
+        return transcript
+
     def _transcript(self, metadata: VideoMetadata, stages: "_StageTracker") -> Transcript:
         video_id = metadata.video_id
         track = select_caption_track(metadata)
         if track is not None:
             stages.enter(PipelineStage.FETCHING_CAPTIONS)
             try:
-                return self._caption_provider.fetch_captions(video_id, track)
+                return self._plausible_captions(metadata, track)
             except CaptionsUnavailableError as error:
                 logger.info(
                     "captions unavailable, transcribing the audio instead",
