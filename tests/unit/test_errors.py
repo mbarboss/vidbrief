@@ -6,6 +6,7 @@ from vidbrief.domain.errors import (
     ExternalServiceError,
     InvalidVideoUrlError,
     LiveStreamNotSupportedError,
+    MissingDependencyError,
     NoSpeechDetectedError,
     RateLimitedError,
     UnsupportedLanguageError,
@@ -28,6 +29,7 @@ from vidbrief.domain.errors import (
         RateLimitedError("summary_rate_limited"),
         NoSpeechDetectedError("no_speech"),
         UnsupportedLanguageError("unsupported_language"),
+        MissingDependencyError("deno"),
     ],
     ids=type,
 )
@@ -59,3 +61,12 @@ def test_rate_limit_is_an_external_service_failure_with_its_own_message() -> Non
     assert isinstance(error, ExternalServiceError)
     assert error.user_message != ExternalServiceError("network").user_message
     assert "try again later" in error.user_message
+
+
+def test_missing_dependency_names_the_program_and_points_to_the_readme() -> None:
+    error = MissingDependencyError("deno")
+
+    assert error.reason == "deno_not_found"
+    assert error.tool == "deno"
+    assert "'deno'" in error.user_message
+    assert "README" in error.user_message
