@@ -22,6 +22,18 @@ YouTube URL ─► validate ─► captions? ──yes────────�
                               no ─► download audio ─► transcribe ─► summarize ─► result
 ```
 
+### Which captions are used
+
+When a video has captions, vidbrief picks one track in this order and only transcribes the
+audio when none fits:
+
+1. Captions written by the uploader in the spoken language.
+2. YouTube's automatic speech recognition in the spoken language.
+3. Captions written by the uploader in another language (English first).
+
+Machine-translated automatic captions are never used; the summarizer translates from the
+original text instead. Sound-only cues such as `[Music]` or `[Applause]` are dropped.
+
 ## Supported links
 
 Only video links on YouTube's own hosts are accepted; the `https://` prefix is optional and

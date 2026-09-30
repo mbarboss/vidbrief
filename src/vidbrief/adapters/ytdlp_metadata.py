@@ -1,25 +1,22 @@
 """Video metadata lookup backed by yt-dlp's Python API."""
 
-import logging
 import re
 from collections.abc import Callable
-from typing import Any, Protocol, Self
+from typing import Any
 from urllib.parse import urlsplit
 
 import yt_dlp
 from yt_dlp.utils import YoutubeDLError
 
+from vidbrief.adapters.ytdlp_common import YoutubeDLFactory, base_options
 from vidbrief.domain.errors import (
     ExternalServiceError,
     LiveStreamNotSupportedError,
     VidbriefError,
     VideoUnavailableError,
 )
-from vidbrief.domain.models import LiveStatus, VideoMetadata
+from vidbrief.domain.models import ORIGINAL_TRACK_SUFFIX, LiveStatus, VideoMetadata
 from vidbrief.domain.video import VideoId
-
-logger = logging.getLogger(__name__)
-_ytdlp_logger = logging.getLogger("vidbrief.adapters.ytdlp")
 
 _THUMBNAIL_HOST = "i.ytimg.com"
 # Loose BCP 47 shape: keeps codes like "en", "pt-BR" or "en-orig" and drops pseudo-tracks
@@ -40,34 +37,6 @@ _ERROR_MARKERS: tuple[tuple[str, Callable[[str], VidbriefError], str], ...] = (
     ("live event will begin", LiveStreamNotSupportedError, "is_upcoming"),
     ("premieres in", LiveStreamNotSupportedError, "is_upcoming"),
 )
-
-
-class _InfoExtractor(Protocol):
-    def __enter__(self) -> Self: ...
-
-    def __exit__(self, *exc_info: object) -> None: ...
-
-    def extract_info(self, url: str, download: bool) -> Any: ...
-
-
-YoutubeDLFactory = Callable[[dict[str, Any]], _InfoExtractor]
-
-
-class _YtDlpLogger:
-    """Forwards yt-dlp output into standard logging instead of stdout/stderr."""
-
-    def debug(self, message: str) -> None:
-        _ytdlp_logger.debug(message)
-
-    def info(self, message: str) -> None:
-        # yt-dlp's "info" is progress chatter, not an application-level event.
-        _ytdlp_logger.debug(message)
-
-    def warning(self, message: str) -> None:
-        _ytdlp_logger.warning(message)
-
-    def error(self, message: str) -> None:
-        _ytdlp_logger.error(message)
 
 
 class YtDlpMetadataProvider:
@@ -98,7 +67,7 @@ class YtDlpMetadataProvider:
             ExternalServiceError: If yt-dlp fails or answers for a different video.
         """
         try:
-            with self._ydl_factory(self._options()) as ydl:
+            with self._ydl_factory(base_options(self._socket_timeout_seconds)) as ydl:
                 info = ydl.extract_info(video_id.canonical_url, download=False)
         except YoutubeDLError as error:
             raise _translate_error(str(error)) from error
@@ -106,18 +75,6 @@ class YtDlpMetadataProvider:
         if not isinstance(info, dict) or info.get("id") != video_id.value:
             raise ExternalServiceError("unexpected_response")
         return _to_metadata(video_id, info)
-
-    def _options(self) -> dict[str, Any]:
-        # No cookie options on purpose: restricted videos are rejected rather than accessed
-        # with the user's Google session.
-        return {
-            "skip_download": True,
-            "noplaylist": True,
-            "quiet": True,
-            "no_warnings": False,
-            "socket_timeout": self._socket_timeout_seconds,
-            "logger": _YtDlpLogger(),
-        }
 
 
 def _translate_error(message: str) -> VidbriefError:
@@ -130,6 +87,7 @@ def _translate_error(message: str) -> VidbriefError:
 
 def _to_metadata(video_id: VideoId, info: dict[str, Any]) -> VideoMetadata:
     title = info.get("title")
+    auto_caption_languages = _parse_languages(info.get("automatic_captions"))
     return VideoMetadata(
         video_id=video_id,
         title=title.strip() if isinstance(title, str) else "",
@@ -137,7 +95,8 @@ def _to_metadata(video_id: VideoId, info: dict[str, Any]) -> VideoMetadata:
         thumbnail_url=_parse_thumbnail(info.get("thumbnail")),
         live_status=_parse_live_status(info),
         caption_languages=_parse_languages(info.get("subtitles")),
-        auto_caption_languages=_parse_languages(info.get("automatic_captions")),
+        auto_caption_languages=auto_caption_languages,
+        original_language=_parse_original_language(info.get("language"), auto_caption_languages),
     )
 
 
@@ -179,4 +138,19 @@ def _parse_languages(raw: object) -> tuple[str, ...]:
         return ()
     return tuple(
         sorted(code for code in raw if isinstance(code, str) and _LANGUAGE_CODE_RE.fullmatch(code))
+    )
+
+
+def _parse_original_language(raw: object, auto_caption_languages: tuple[str, ...]) -> str | None:
+    if isinstance(raw, str) and _LANGUAGE_CODE_RE.fullmatch(raw):
+        return raw
+    # YouTube often leaves "language" empty, but its speech-recognition track still reveals
+    # which language is spoken.
+    return next(
+        (
+            code.removesuffix(ORIGINAL_TRACK_SUFFIX)
+            for code in auto_caption_languages
+            if code.endswith(ORIGINAL_TRACK_SUFFIX)
+        ),
+        None,
     )

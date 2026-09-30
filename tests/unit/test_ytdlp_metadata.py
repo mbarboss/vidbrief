@@ -1,11 +1,11 @@
 """Tests for the yt-dlp metadata adapter, using a fake in place of ``yt_dlp.YoutubeDL``."""
 
-import logging
-from typing import Any, Self
+from typing import Any
 
 import pytest
 from yt_dlp.utils import DownloadError, YoutubeDLError
 
+from tests.unit.ytdlp_fake import FakeYoutubeDL
 from vidbrief.adapters.ytdlp_metadata import YtDlpMetadataProvider
 from vidbrief.domain.errors import (
     ExternalServiceError,
@@ -19,31 +19,6 @@ from vidbrief.domain.video import VideoId
 
 VIDEO_ID = VideoId("jNQXAC9IVRw")
 THUMBNAIL_URL = "https://i.ytimg.com/vi/jNQXAC9IVRw/maxresdefault.jpg"
-
-
-class FakeYoutubeDL:
-    """Stands in for both the ``YoutubeDL`` class (when called) and its instances."""
-
-    def __init__(self, outcome: dict[str, Any] | Exception | None) -> None:
-        self.outcome = outcome
-        self.options: dict[str, Any] = {}
-        self.extracted: list[tuple[str, bool]] = []
-
-    def __call__(self, options: dict[str, Any]) -> Self:
-        self.options = options
-        return self
-
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(self, *exc_info: object) -> None:
-        return None
-
-    def extract_info(self, url: str, download: bool) -> Any:
-        self.extracted.append((url, download))
-        if isinstance(self.outcome, Exception):
-            raise self.outcome
-        return self.outcome
 
 
 def _info(**overrides: Any) -> dict[str, Any]:
@@ -97,26 +72,6 @@ class TestRequest:
         assert "cookiefile" not in fake.options
         assert "cookiesfrombrowser" not in fake.options
 
-    def test_routes_ytdlp_output_to_logging(self, caplog: pytest.LogCaptureFixture) -> None:
-        fake = FakeYoutubeDL(_info())
-        YtDlpMetadataProvider(socket_timeout_seconds=30.0, ydl_factory=fake).fetch_metadata(
-            VIDEO_ID
-        )
-        ytdlp_logger = fake.options["logger"]
-
-        with caplog.at_level(logging.DEBUG, logger="vidbrief.adapters.ytdlp"):
-            ytdlp_logger.debug("debug line")
-            ytdlp_logger.info("info line")
-            ytdlp_logger.warning("warning line")
-            ytdlp_logger.error("error line")
-
-        assert [(r.levelno, r.getMessage()) for r in caplog.records] == [
-            (logging.DEBUG, "debug line"),
-            (logging.DEBUG, "info line"),
-            (logging.WARNING, "warning line"),
-            (logging.ERROR, "error line"),
-        ]
-
 
 class TestMapping:
     def test_maps_a_regular_video(self) -> None:
@@ -128,7 +83,23 @@ class TestMapping:
             live_status=LiveStatus.NOT_LIVE,
             caption_languages=("de", "en"),
             auto_caption_languages=("en", "en-orig", "pt-BR"),
+            original_language="en",
         )
+
+    @pytest.mark.parametrize(
+        ("overrides", "expected"),
+        [
+            ({"language": "pt-BR"}, "pt-BR"),
+            ({"language": None}, "en"),
+            ({"language": "../etc"}, "en"),
+            ({"language": None, "automatic_captions": {"en": [{}]}}, None),
+            ({"language": None, "automatic_captions": {"ja-orig": [{}], "en": [{}]}}, "ja"),
+        ],
+    )
+    def test_detects_the_original_language(
+        self, overrides: dict[str, Any], expected: str | None
+    ) -> None:
+        assert _fetch(_info(**overrides)).original_language == expected
 
     @pytest.mark.parametrize(
         ("raw_title", "expected"),
