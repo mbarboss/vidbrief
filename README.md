@@ -1,5 +1,7 @@
 # vidbrief
 
+[![CI](https://github.com/mbarboss/vidbrief/actions/workflows/ci.yml/badge.svg)](https://github.com/mbarboss/vidbrief/actions/workflows/ci.yml)
+
 > Paste a YouTube link and get a concise AI-generated summary in your language.
 
 **Status:** 🚧 Work in progress (MVP under development)
@@ -113,25 +115,41 @@ Accepted hosts: `youtube.com`, `www.youtube.com`, `m.youtube.com`, `youtu.be` an
 | Web | FastAPI, Jinja2, HTMX, Server-Sent Events |
 | Media | yt-dlp (+ Deno JS runtime), ffmpeg |
 | AI | Groq API (Whisper for speech-to-text, GPT-OSS for summarization) |
-| Quality | Ruff, mypy (strict), pytest, pre-commit |
+| Quality | Ruff, mypy (strict), pytest, pre-commit, poethepoet, GitHub Actions |
 | Security | Ruff security rules (Bandit), detect-secrets, pip-audit |
 
 ## Prerequisites
 
-- Ubuntu (or another Linux distribution)
-- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+vidbrief runs on Linux, macOS and Windows; every change is tested on all three by CI
+(Ubuntu, macOS and Windows with Python 3.12 and 3.14).
+
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) (installs Python for you)
+- [ffmpeg](https://ffmpeg.org/) (audio conversion)
 - [Deno](https://deno.com/) (required by yt-dlp for YouTube)
-- ffmpeg
 - A [Groq API key](https://console.groq.com/keys)
+
+| System | Install the tools |
+|---|---|
+| Ubuntu / Debian | `sudo apt install ffmpeg`, then `curl -LsSf https://astral.sh/uv/install.sh \| sh` and `curl -fsSL https://deno.land/install.sh \| sh` |
+| macOS ([Homebrew](https://brew.sh/)) | `brew install uv ffmpeg deno` |
+| Windows (winget) | `winget install astral-sh.uv Gyan.FFmpeg DenoLand.Deno` |
+| Windows ([Chocolatey](https://chocolatey.org/)) | `choco install ffmpeg deno`, plus uv with winget or its [installer](https://docs.astral.sh/uv/getting-started/installation/) |
+
+Open a new terminal afterwards so the tools are on your `PATH`.
 
 ## Getting started
 
 ```bash
 git clone https://github.com/mbarboss/vidbrief.git
 cd vidbrief
-make install
-cp .env.example .env && chmod 600 .env
-# Edit .env and set GROQ_API_KEY
+uv run poe install
+```
+
+Then create your `.env` from the example and set `GROQ_API_KEY` in it:
+
+```bash
+cp .env.example .env && chmod 600 .env    # Linux and macOS
+Copy-Item .env.example .env               # Windows (PowerShell)
 ```
 
 ### Command line
@@ -139,8 +157,8 @@ cp .env.example .env && chmod 600 .env
 Until the web interface is ready, videos can be summarized from the terminal:
 
 ```bash
-uv run python -m vidbrief "https://youtu.be/jNQXAC9IVRw" --language pt-BR
-uv run python -m vidbrief "https://youtu.be/jNQXAC9IVRw" > summary.md   # save to a file
+uv run vidbrief "https://youtu.be/jNQXAC9IVRw" --language pt-BR
+uv run vidbrief "https://youtu.be/jNQXAC9IVRw" > summary.md   # save to a file
 ```
 
 Progress is shown on stderr (for example `Transcribing the audio (2/5)...` or
@@ -171,11 +189,17 @@ All settings are read from environment variables or `.env`. See [`.env.example`]
 
 ## Development
 
+Tasks are defined in `pyproject.toml` and run the same way on every system:
+
 ```bash
-make help       # list all targets
-make format     # auto-format and fix lint issues
-make check      # lint + typecheck + tests + dependency audit
+uv run poe            # list all tasks
+uv run poe format     # auto-format and fix lint issues
+uv run poe check      # lint + typecheck + tests + dependency audit
 ```
+
+CI runs every pre-commit hook and the dependency audit, then the type checks and tests
+(including the real-ffmpeg ones) on Ubuntu, macOS and Windows. Actions are pinned to
+commit SHAs and Dependabot proposes weekly updates for them and for `uv.lock`.
 
 Integration tests hit real services and are skipped by default: `uv run pytest -m integration`.
 The Groq tests need `GROQ_API_KEY` in `.env`; they use about 20 seconds of the audio
