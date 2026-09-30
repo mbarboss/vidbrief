@@ -11,17 +11,13 @@ import httpx
 import pytest
 from groq import Omit, omit
 
-from vidbrief.adapters.groq_transcriber import (
-    GroqTranscriber,
-    TranscriptionResult,
-    build_groq_client,
-)
+from vidbrief.adapters.groq_transcriber import GroqTranscriber, TranscriptionResult
 from vidbrief.config import Settings
 from vidbrief.domain.errors import (
     AudioProcessingError,
     ExternalServiceError,
     NoSpeechDetectedError,
-    TranscriptionRateLimitedError,
+    RateLimitedError,
 )
 from vidbrief.domain.models import AudioChunk, TranscriptSource
 from vidbrief.domain.ports import Transcriber
@@ -315,7 +311,7 @@ class TestRateLimits:
     ) -> None:
         harness = Harness(_rate_limited(retry_after))
 
-        with pytest.raises(TranscriptionRateLimitedError) as caught:
+        with pytest.raises(RateLimitedError) as caught:
             harness.transcriber.transcribe(VIDEO_ID, _chunks(tmp_path), None)
 
         assert caught.value.reason == "transcription_rate_limited"
@@ -325,7 +321,7 @@ class TestRateLimits:
     def test_gives_up_when_limits_persist(self, tmp_path: Path) -> None:
         harness = Harness(_rate_limited("1"), _rate_limited("1"), _rate_limited("1"))
 
-        with pytest.raises(TranscriptionRateLimitedError):
+        with pytest.raises(RateLimitedError):
             harness.transcriber.transcribe(VIDEO_ID, _chunks(tmp_path), None)
 
         assert len(harness.endpoint.calls) == 3
@@ -351,7 +347,6 @@ class TestPermanentFailures:
         ("error_type", "status_code"),
         [
             (groq.BadRequestError, 400),
-            (groq.APIStatusError, 413),
             (groq.UnprocessableEntityError, 422),
         ],
     )
@@ -364,6 +359,15 @@ class TestPermanentFailures:
             harness.transcriber.transcribe(VIDEO_ID, _chunks(tmp_path), None)
 
         assert caught.value.reason == "transcription_rejected"
+        assert len(harness.endpoint.calls) == 1
+
+    def test_oversized_audio_is_reported_as_too_large(self, tmp_path: Path) -> None:
+        harness = Harness(_status_error(groq.APIStatusError, 413))
+
+        with pytest.raises(ExternalServiceError) as caught:
+            harness.transcriber.transcribe(VIDEO_ID, _chunks(tmp_path), None)
+
+        assert caught.value.reason == "transcription_request_too_large"
         assert len(harness.endpoint.calls) == 1
 
     def test_error_never_echoes_the_provider_message(self, tmp_path: Path) -> None:
@@ -407,8 +411,9 @@ class TestPermanentFailures:
 
 
 class TestFromSettings:
-    @pytest.fixture
-    def settings(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Settings:
+    def test_uses_the_configured_model(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         # A developer's real .env or exported variables must never leak into test results.
         monkeypatch.chdir(tmp_path)
         for name in list(os.environ):
@@ -416,17 +421,7 @@ class TestFromSettings:
                 monkeypatch.delenv(name)
         monkeypatch.setenv("GROQ_API_KEY", FAKE_API_KEY)
         monkeypatch.setenv("VIDBRIEF_TRANSCRIPTION_MODEL", MODEL)
-        monkeypatch.setenv("VIDBRIEF_REQUEST_TIMEOUT_SECONDS", "42")
-        return Settings()
 
-    def test_builds_a_groq_client_without_its_own_retries(self, settings: Settings) -> None:
-        client = build_groq_client(settings)
-
-        assert client.api_key == FAKE_API_KEY
-        assert client.max_retries == 0
-        assert client.timeout == 42.0
-
-    def test_uses_the_configured_model(self, settings: Settings) -> None:
-        transcriber = GroqTranscriber.from_settings(settings)
+        transcriber = GroqTranscriber.from_settings(Settings())
 
         assert transcriber.model == MODEL

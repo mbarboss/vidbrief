@@ -82,16 +82,22 @@ class ExternalServiceError(VidbriefError):
     _user_message = "A required service is temporarily unavailable. Please try again later."
 
 
-class TranscriptionRateLimitedError(ExternalServiceError):
-    """Raised when the speech-to-text quota is exhausted for longer than it is worth waiting."""
+class RateLimitedError(ExternalServiceError):
+    """Raised when an AI service quota is exhausted for longer than it is worth waiting."""
 
-    _user_message = "The transcription quota has been reached. Please try again later."
+    _user_message = "The AI service quota has been reached. Please try again later."
 
 
 class NoSpeechDetectedError(VidbriefError):
     """Raised when speech-to-text finds nothing said in the audio."""
 
     _user_message = "No speech could be detected in this video."
+
+
+class UnsupportedLanguageError(VidbriefError):
+    """Raised when a summary is requested in a language outside the allowlist."""
+
+    _user_message = "Please choose one of the supported summary languages."
 
 
 def _describe_limit(seconds: int) -> str:

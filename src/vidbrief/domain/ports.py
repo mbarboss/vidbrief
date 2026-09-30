@@ -4,7 +4,13 @@ from collections.abc import Sequence
 from contextlib import AbstractContextManager
 from typing import Protocol
 
-from vidbrief.domain.models import AudioChunk, CaptionTrack, Transcript, VideoMetadata
+from vidbrief.domain.models import (
+    AudioChunk,
+    CaptionTrack,
+    Summary,
+    Transcript,
+    VideoMetadata,
+)
 from vidbrief.domain.video import VideoId
 
 
@@ -65,7 +71,26 @@ class Transcriber(Protocol):
 
         Raises:
             NoSpeechDetectedError: If nothing is said in the audio.
-            TranscriptionRateLimitedError: If the speech-to-text quota is exhausted.
+            RateLimitedError: If the speech-to-text quota is exhausted.
             AudioProcessingError: If a chunk cannot be read.
             ExternalServiceError: If the speech-to-text service fails or rejects the audio.
+        """
+
+
+class Summarizer(Protocol):
+    """Writes a summary of a transcript with an LLM."""
+
+    def summarize(self, transcript: Transcript, language: str) -> Summary:
+        """Return a TL;DR and key points of ``transcript`` written in ``language``.
+
+        Args:
+            transcript: Untrusted text; it is only ever passed to the LLM as data.
+            language: A code from ``SUPPORTED_SUMMARY_LANGUAGES``.
+
+        Raises:
+            UnsupportedLanguageError: If ``language`` is not in the allowlist.
+            NoSpeechDetectedError: If the transcript is blank.
+            RateLimitedError: If the LLM quota is exhausted.
+            ExternalServiceError: If the LLM fails, rejects the request or answers
+                unexpectedly.
         """

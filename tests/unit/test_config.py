@@ -46,6 +46,7 @@ class TestDefaults:
         assert settings.host == "127.0.0.1"
         assert settings.port == 8000
         assert settings.log_level == "INFO"
+        assert settings.summary_max_request_tokens is None
 
     def test_environment_overrides_defaults(self, make_settings: SettingsFactory) -> None:
         settings = make_settings(VIDBRIEF_SUMMARY_MODEL="openai/gpt-oss-20b", VIDBRIEF_PORT="9000")
@@ -126,6 +127,8 @@ class TestResourceLimits:
             ("VIDBRIEF_PORT", "80"),
             ("VIDBRIEF_PORT", "70000"),
             ("VIDBRIEF_LOG_LEVEL", "VERBOSE"),
+            ("VIDBRIEF_SUMMARY_MAX_REQUEST_TOKENS", "1999"),
+            ("VIDBRIEF_SUMMARY_MAX_REQUEST_TOKENS", "131073"),
         ],
     )
     def test_rejects_out_of_range_values(
@@ -138,6 +141,11 @@ class TestResourceLimits:
         settings = make_settings(VIDBRIEF_AUDIO_CHUNK_MAX_MB="24")
 
         assert settings.audio_chunk_max_bytes == 24_000_000
+
+    def test_summary_request_budget_can_be_pinned(self, make_settings: SettingsFactory) -> None:
+        settings = make_settings(VIDBRIEF_SUMMARY_MAX_REQUEST_TOKENS="30000")
+
+        assert settings.summary_max_request_tokens == 30000
 
 
 class TestGetSettings:

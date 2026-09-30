@@ -58,6 +58,28 @@ On Groq's free tier, speech-to-text is limited to 2 hours of audio per hour and 
 per day, so only a few long videos without captions can be transcribed each day. Videos
 with captions do not use this quota.
 
+### Summary
+
+The transcript is summarized by a Groq chat model (`VIDBRIEF_SUMMARY_MODEL`) into a TL;DR
+and 3 to 10 key points, in the language you choose. The model must support strict
+structured outputs (currently `openai/gpt-oss-120b`, `openai/gpt-oss-20b` and
+`qwen/qwen3.8-27b` on Groq).
+
+Groq limits how many tokens each API key can use per minute, counting the prompt plus the
+longest answer a request allows. vidbrief therefore sizes every request to that limit:
+
+- A transcript that fits in one request is summarized directly.
+- A longer one is cut into chunks (at sentence ends when possible); each chunk becomes
+  short notes, and the notes are summarized. Notes that are still too long are condensed
+  again first.
+- The first request uses a size that fits the free tier. After that, vidbrief reads the
+  limit Groq reports in every response and uses 75% of it (up to 32,000 tokens per request),
+  so paid plans automatically get fewer, larger requests. To pin the size instead, set
+  `VIDBRIEF_SUMMARY_MAX_REQUEST_TOKENS`.
+
+On the free tier (8,000 tokens per minute), a 2-hour video needs about one request per
+minute, so its summary takes around 8 to 10 minutes; on a paid plan it takes seconds.
+
 ## Supported links
 
 Only video links on YouTube's own hosts are accepted; the `https://` prefix is optional and
@@ -124,6 +146,7 @@ All settings are read from environment variables or `.env`. See [`.env.example`]
 | `VIDBRIEF_DEFAULT_SUMMARY_LANGUAGE` | `pt-BR` | Default summary language (allowlisted) |
 | `VIDBRIEF_MAX_VIDEO_DURATION_SECONDS` | `7200` | Longest video accepted |
 | `VIDBRIEF_AUDIO_CHUNK_MAX_MB` | `24` | Max audio chunk size sent to Groq, in decimal MB |
+| `VIDBRIEF_SUMMARY_MAX_REQUEST_TOKENS` | — (automatic) | Fixed token budget (prompt + answer) per summary request, 2000 to 131072; unset follows the limit Groq reports |
 | `VIDBRIEF_REQUEST_TIMEOUT_SECONDS` | `120` | Timeout for external API calls |
 | `VIDBRIEF_MAX_CONCURRENT_JOBS` | `1` | Parallel summarization jobs |
 | `VIDBRIEF_HOST` | `127.0.0.1` | Bind address (loopback only) |
@@ -139,8 +162,8 @@ make check      # lint + typecheck + tests + dependency audit
 ```
 
 Integration tests hit real services and are skipped by default: `uv run pytest -m integration`.
-The transcription test needs `GROQ_API_KEY` in `.env` and uses about 20 seconds of the
-Groq audio quota.
+The Groq tests need `GROQ_API_KEY` in `.env`; they use about 20 seconds of the audio
+quota and a few hundred chat tokens.
 
 ## Security
 
@@ -155,7 +178,10 @@ Groq audio quota.
   a crafted media file cannot make it fetch URLs.
 - Errors from Groq are reduced to fixed reason codes, so provider messages never reach the
   UI or the logs, and transcript text is never logged.
-- Transcripts are treated as untrusted data in LLM prompts (prompt-injection mitigation).
+- Transcripts are treated as untrusted data in LLM prompts (prompt-injection mitigation):
+  they are sent between delimiter tags (forged tags are removed) under rules that forbid
+  following instructions found in them, the model has no tools, its answer must match a
+  strict JSON schema, and the summary language comes only from the allowlist.
 - LLM output is sanitized before rendering (XSS protection).
 
 ## Legal notice

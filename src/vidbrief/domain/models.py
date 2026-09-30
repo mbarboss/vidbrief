@@ -93,3 +93,17 @@ class AudioChunk:
 
     index: int
     path: Path
+
+
+@dataclass(frozen=True, slots=True)
+class Summary:
+    """An AI-written summary of a video.
+
+    ``tldr`` and ``key_points`` are LLM output and must be sanitized before being rendered
+    as HTML.
+    """
+
+    video_id: VideoId
+    language: str
+    tldr: str
+    key_points: tuple[str, ...]
