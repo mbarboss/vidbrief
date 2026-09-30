@@ -7,7 +7,7 @@ from vidbrief.domain.errors import (
     InvalidVideoUrlError,
     LiveStreamNotSupportedError,
     NoSpeechDetectedError,
-    TranscriptionRateLimitedError,
+    RateLimitedError,
     VidbriefError,
     VideoDurationUnknownError,
     VideoTooLongError,
@@ -24,7 +24,7 @@ from vidbrief.domain.errors import (
         VideoDurationUnknownError("missing_duration"),
         ExternalServiceError("network"),
         VideoTooLongError(7200),
-        TranscriptionRateLimitedError("transcription_rate_limited"),
+        RateLimitedError("summary_rate_limited"),
         NoSpeechDetectedError("no_speech"),
     ],
     ids=type,
@@ -52,7 +52,7 @@ class TestVideoTooLongError:
 
 
 def test_rate_limit_is_an_external_service_failure_with_its_own_message() -> None:
-    error = TranscriptionRateLimitedError("transcription_rate_limited")
+    error = RateLimitedError("summary_rate_limited")
 
     assert isinstance(error, ExternalServiceError)
     assert error.user_message != ExternalServiceError("network").user_message

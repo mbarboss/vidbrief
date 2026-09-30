@@ -65,7 +65,7 @@ class Transcriber(Protocol):
 
         Raises:
             NoSpeechDetectedError: If nothing is said in the audio.
-            TranscriptionRateLimitedError: If the speech-to-text quota is exhausted.
+            RateLimitedError: If the speech-to-text quota is exhausted.
             AudioProcessingError: If a chunk cannot be read.
             ExternalServiceError: If the speech-to-text service fails or rejects the audio.
         """
