@@ -3,12 +3,14 @@
 import io
 import os
 import runpy
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import TextIO
 
 import pytest
+from starlette.types import ASGIApp, Receive, Scope, Send
 
+from tests.unit.conftest import SettingsFactory
 from vidbrief import cli
 from vidbrief.cli import main
 from vidbrief.config import LogLevel, Settings
@@ -16,7 +18,7 @@ from vidbrief.domain.errors import MissingDependencyError, VideoTooLongError
 from vidbrief.domain.models import LiveStatus, Summary, TranscriptSource, VideoMetadata
 from vidbrief.domain.progress import PipelineStage, Progress, ProgressCallback
 from vidbrief.domain.video import VideoId
-from vidbrief.services.pipeline import PipelineResult
+from vidbrief.services.pipeline import PipelineResult, SummaryRunner
 from vidbrief.services.report import to_markdown
 
 FAKE_API_KEY = "gsk_test_not_a_real_key"  # pragma: allowlist secret
@@ -218,3 +220,126 @@ def test_module_entry_point_exits_with_the_status(monkeypatch: pytest.MonkeyPatc
         runpy.run_module("vidbrief", run_name="__main__")
 
     assert caught.value.code == 7
+
+
+class FakeServer:
+    def __init__(self) -> None:
+        self.calls: list[tuple[object, str, int]] = []
+
+    def __call__(self, app: ASGIApp, *, host: str, port: int) -> None:
+        self.calls.append((app, host, port))
+
+
+class Serve:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        self.runner = FakeRunner()
+        self.server = FakeServer()
+        self.logging = LoggingSpy()
+        self.stderr = io.StringIO()
+        self.apps: list[tuple[Settings, object]] = []
+
+    def __call__(self, *argv: str, build: Callable[[Settings], FakeRunner] | None = None) -> int:
+        def create(settings: Settings, runner: SummaryRunner) -> ASGIApp:
+            self.apps.append((settings, runner))
+            return _asgi_app
+
+        return main(
+            ["serve", *argv],
+            load_settings=lambda: self.settings,
+            build=build or (lambda settings: self.runner),
+            setup_logging=self.logging,
+            create_app=create,
+            serve=self.server,
+            stdout=io.StringIO(),
+            stderr=self.stderr,
+        )
+
+
+async def _asgi_app(scope: Scope, receive: Receive, send: Send) -> None:
+    raise AssertionError("not called")
+
+
+class TestServe:
+    def test_serves_the_app_on_the_configured_loopback_address(
+        self, make_settings: SettingsFactory
+    ) -> None:
+        serve = Serve(make_settings(port="8123"))
+
+        assert serve() == 0
+
+        assert serve.apps == [(serve.settings, serve.runner)]
+        assert serve.server.calls == [(_asgi_app, "127.0.0.1", 8123)]
+
+    def test_tells_the_user_where_to_open_it(self, make_settings: SettingsFactory) -> None:
+        serve = Serve(make_settings())
+
+        serve()
+
+        assert serve.stderr.getvalue() == (
+            "vidbrief is running at http://127.0.0.1:8000 (press Ctrl+C to stop)\n"
+        )
+
+    def test_logs_at_the_configured_level_and_masks_the_key(
+        self, make_settings: SettingsFactory
+    ) -> None:
+        serve = Serve(make_settings(log_level="DEBUG"))
+
+        serve()
+
+        assert serve.logging.calls == [("DEBUG", [FAKE_API_KEY])]
+
+    def test_missing_programs_stop_the_server_from_starting(
+        self, make_settings: SettingsFactory
+    ) -> None:
+        serve = Serve(make_settings())
+
+        def build(settings: Settings) -> FakeRunner:
+            raise MissingDependencyError("ffmpeg")
+
+        assert serve(build=build) == 1
+
+        assert "'ffmpeg'" in serve.stderr.getvalue()
+        assert serve.server.calls == []
+
+    def test_configuration_errors_exit_with_status_2(
+        self, monkeypatch: pytest.MonkeyPatch, make_settings: SettingsFactory
+    ) -> None:
+        make_settings()
+        monkeypatch.setenv("VIDBRIEF_PORT", "80")
+        stderr = io.StringIO()
+        server = FakeServer()
+
+        code = main(
+            ["serve"],
+            load_settings=Settings,
+            serve=server,
+            stderr=stderr,
+            setup_logging=LoggingSpy(),
+        )
+
+        assert code == 2
+        assert "port" in stderr.getvalue()
+        assert server.calls == []
+
+    def test_rejects_unknown_arguments(self, make_settings: SettingsFactory) -> None:
+        with pytest.raises(SystemExit) as caught:
+            Serve(make_settings())("--host", "0.0.0.0")
+
+        assert caught.value.code == 2
+
+    def test_the_summary_command_does_not_start_a_server(self, settings: Settings) -> None:
+        server = FakeServer()
+        run = Run(settings)
+
+        main(
+            [URL],
+            load_settings=lambda: settings,
+            build=lambda s: run.runner,
+            setup_logging=run.logging,
+            serve=server,
+            stdout=run.stdout,
+            stderr=run.stderr,
+        )
+
+        assert server.calls == []

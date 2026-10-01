@@ -14,6 +14,8 @@ _GROQ_KEY_PATTERN = r"gsk_[A-Za-z0-9]{20,}"
 _HANDLER_NAME = "vidbrief-json"
 # Anything a LogRecord carries by default; every other attribute came from ``extra=``.
 _STANDARD_RECORD_ATTRS = frozenset(vars(logging.makeLogRecord({}))) | {"message", "asctime"}
+# uvicorn attaches a copy of the message with ANSI color codes, meant only for terminals.
+_DROPPED_EXTRAS = frozenset({"color_message"})
 _TRACEBACK_FORMATTER = logging.Formatter()
 # Extra values of these types cannot hold a secret and stay native JSON values.
 _JSON_SCALARS = (bool, int, float, type(None))
@@ -68,7 +70,9 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         extras = {
-            key: value for key, value in vars(record).items() if key not in _STANDARD_RECORD_ATTRS
+            key: value
+            for key, value in vars(record).items()
+            if key not in _STANDARD_RECORD_ATTRS and key not in _DROPPED_EXTRAS
         }
         payload: dict[str, Any] = {
             **extras,
