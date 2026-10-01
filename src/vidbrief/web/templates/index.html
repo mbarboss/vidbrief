@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="wrap">
+  <div class="home">
+    <div class="intro">
+      <p class="eyebrow mono">YouTube, the short version</p>
+      <h1>What's this video <em>actually</em> about?</h1>
+      <p class="lead">Paste a link and get the main idea plus the key points, written in the language you read best. If the video has captions we use them. If not, we listen to the audio.</p>
+      <ul class="facts mono">
+        <li>Videos up to <b>{{ max_duration }}</b></li>
+        <li>A 13 min talk <b>about 15 s</b></li>
+        <li>A 1 h lecture <b>about 75 s</b></li>
+      </ul>
+    </div>
+    {% if accepted %}
+      {% include "partials/accepted.html" %}
+    {% else %}
+      {% include "partials/form.html" %}
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

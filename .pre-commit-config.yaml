@@ -1,3 +1,5 @@
+# Third-party assets are kept byte-for-byte as published; their hashes are pinned in tests.
+exclude: ^src/vidbrief/web/static/(vendor|fonts)/
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

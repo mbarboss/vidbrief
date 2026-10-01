@@ -1,2 +1,5 @@
 # Git on Windows must not rewrite line endings, or formatters and hashes see false diffs.
 * text=auto eol=lf
+# Vendored assets must stay byte-identical to the published files (hashes are pinned).
+src/vidbrief/web/static/vendor/** -text
+src/vidbrief/web/static/fonts/** -text

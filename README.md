@@ -168,10 +168,14 @@ Copy-Item .env.example .env               # Windows (PowerShell)
 uv run vidbrief serve
 ```
 
-The server listens on `VIDBRIEF_HOST`:`VIDBRIEF_PORT` (default `http://127.0.0.1:8000`) and
-stops with Ctrl+C. It checks for ffmpeg, ffprobe and Deno before starting and logs JSON at
-`VIDBRIEF_LOG_LEVEL`. The pages are still being built; for now it only answers
-`GET /healthz`.
+Then open `http://127.0.0.1:8000` (or your `VIDBRIEF_HOST`:`VIDBRIEF_PORT`); Ctrl+C stops
+the server. It checks for ffmpeg, ffprobe and Deno before starting and logs JSON at
+`VIDBRIEF_LOG_LEVEL`.
+
+The home page takes a link and a summary language and checks both; running the summary from
+the page arrives in the next update, so for now it shows the equivalent command. The page
+follows the system's light or dark theme (the header button switches and remembers it),
+works on phones, and the form also works with JavaScript disabled.
 
 ### Command line
 
@@ -207,6 +211,17 @@ All settings are read from environment variables or `.env`. See [`.env.example`]
 | `VIDBRIEF_HOST` | `127.0.0.1` | Bind address (loopback only) |
 | `VIDBRIEF_PORT` | `8000` | HTTP port |
 | `VIDBRIEF_LOG_LEVEL` | `INFO` | Log verbosity |
+
+## Third-party assets
+
+Served from the package itself, never from a CDN, and kept byte-for-byte as published (the
+HTMX hash is pinned in the tests and in the page's `integrity` attribute):
+
+| Asset | Version | License |
+|---|---|---|
+| [HTMX](https://htmx.org/) | 2.0.11 | 0BSD |
+| [Bricolage Grotesque](https://github.com/ateliertriay/bricolage) (variable, Latin) | Fontsource 5.3.0 | SIL OFL 1.1 |
+| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (variable, Latin) | Fontsource 5.3.0 | SIL OFL 1.1 |
 
 ## Development
 

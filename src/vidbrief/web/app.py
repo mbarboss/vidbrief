@@ -1,11 +1,15 @@
 """FastAPI application factory."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from vidbrief.config import Settings
 from vidbrief.services.pipeline import SummaryRunner
 from vidbrief.web.csrf import CsrfProtector
+from vidbrief.web.routes import STATIC_DIR, router
 from vidbrief.web.security import CrossOriginGuardMiddleware, SecurityHeadersMiddleware
 from vidbrief.web.server import url_host
 
@@ -31,7 +35,16 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    app.exception_handler(StarletteHTTPException)(_plain_text_error)
+    app.include_router(router)
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
     return app
+
+
+async def _plain_text_error(request: Request, exc: StarletteHTTPException) -> Response:
+    # The pages are HTML, not a JSON API: HTMX shows this text in the form's error slot.
+    return PlainTextResponse(str(exc.detail), status_code=exc.status_code, headers=exc.headers)
 
 
 def allowed_hosts(settings: Settings) -> list[str]:
