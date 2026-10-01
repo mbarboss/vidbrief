@@ -186,8 +186,8 @@ uv run vidbrief "https://youtu.be/jNQXAC9IVRw" --language pt-BR
 uv run vidbrief "https://youtu.be/jNQXAC9IVRw" > summary.md   # save to a file
 ```
 
-Progress is shown on stderr (for example `Transcribing the audio (2/5)...` or
-`Summarizing (3/~9)...`, where `~` marks an estimate) and the summary is printed to stdout
+Progress is shown on stderr (for example `Transcribing (2/5)...` or
+`Writing the summary (3/~9)...`, where `~` marks an estimate) and the summary is printed to stdout
 as Markdown. `--language` accepts the allowlisted codes (default:
 `VIDBRIEF_DEFAULT_SUMMARY_LANGUAGE`) and `--verbose` shows JSON logs at
 `VIDBRIEF_LOG_LEVEL`. The exit status is 0 on success, 1 when the video cannot be

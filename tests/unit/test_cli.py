@@ -111,8 +111,8 @@ def test_shows_progress_on_stderr(settings: Settings) -> None:
 
     assert run.stderr.getvalue().splitlines() == [
         "Checking the video...",
-        "Transcribing the audio (1/2)...",
-        "Summarizing (2/~5)...",
+        "Transcribing (1/2)...",
+        "Writing the summary (2/~5)...",
     ]
 
 
