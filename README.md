@@ -162,6 +162,17 @@ cp .env.example .env && chmod 600 .env    # Linux and macOS
 Copy-Item .env.example .env               # Windows (PowerShell)
 ```
 
+### Web server
+
+```bash
+uv run vidbrief serve
+```
+
+The server listens on `VIDBRIEF_HOST`:`VIDBRIEF_PORT` (default `http://127.0.0.1:8000`) and
+stops with Ctrl+C. It checks for ffmpeg, ffprobe and Deno before starting and logs JSON at
+`VIDBRIEF_LOG_LEVEL`. The pages are still being built; for now it only answers
+`GET /healthz`.
+
 ### Command line
 
 Until the web interface is ready, videos can be summarized from the terminal:
@@ -232,6 +243,17 @@ quota and a few hundred chat tokens.
   they are sent between delimiter tags (forged tags are removed) under rules that forbid
   following instructions found in them, the model has no tools, its answer must match a
   strict JSON schema, and the summary language comes only from the allowlist.
+- The web server is hardened against attacks from other sites open in the same browser:
+  - it only answers to loopback host names (`localhost`, `127.0.0.1` or the configured
+    address), which stops DNS rebinding;
+  - state-changing requests sent by another site are refused based on `Sec-Fetch-Site`
+    (or `Origin` in browsers without it), and forms also need a CSRF token tied to an
+    `HttpOnly`, `SameSite=Strict` cookie;
+  - every response carries a strict Content Security Policy (no inline scripts, no
+    `eval`, only local files plus YouTube thumbnails), `nosniff`, `no-referrer`,
+    anti-framing headers and `Cache-Control: no-store`;
+  - API docs are disabled, the `Server` header and access log are off and proxy headers are
+    ignored.
 - LLM output is sanitized before rendering (XSS protection). In the Markdown report, the
   video title and the summary are flattened to single lines, stripped of control and
   bidirectional characters and escaped, so they cannot inject links, HTML or terminal
