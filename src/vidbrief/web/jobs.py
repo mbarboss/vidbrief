@@ -234,6 +234,10 @@ class JobManager:
             self._evict()
             return self._jobs.get(job_id)
 
+    def now(self) -> float:
+        """The current time on the clock jobs are timed with."""
+        return self._clock()
+
     def shutdown(self) -> None:
         """Log the jobs that will be lost because the server is stopping."""
         with self._lock:

@@ -1,5 +1,8 @@
 """FastAPI application factory."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,6 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from vidbrief.config import Settings
 from vidbrief.services.pipeline import SummaryRunner
 from vidbrief.web.csrf import CsrfProtector
+from vidbrief.web.jobs import JobManager
 from vidbrief.web.routes import STATIC_DIR, router
 from vidbrief.web.security import CrossOriginGuardMiddleware, SecurityHeadersMiddleware
 from vidbrief.web.server import url_host
@@ -17,13 +21,27 @@ _LOOPBACK_NAMES = ("localhost", "127.0.0.1")
 
 
 def create_app(
-    settings: Settings, runner: SummaryRunner, *, csrf: CsrfProtector | None = None
+    settings: Settings,
+    runner: SummaryRunner,
+    *,
+    csrf: CsrfProtector | None = None,
+    jobs: JobManager | None = None,
 ) -> FastAPI:
     """Build the web app around an already validated configuration and pipeline."""
-    app = FastAPI(title="vidbrief", docs_url=None, redoc_url=None, openapi_url=None)
+    job_manager = jobs or JobManager(runner, max_concurrent=settings.max_concurrent_jobs)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        yield
+        job_manager.shutdown()
+
+    app = FastAPI(
+        title="vidbrief", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
+    )
     app.state.settings = settings
     app.state.runner = runner
     app.state.csrf = csrf or CsrfProtector()
+    app.state.jobs = job_manager
 
     # Starlette runs the last added middleware first, so the security headers also reach
     # the responses the host and origin checks reject.

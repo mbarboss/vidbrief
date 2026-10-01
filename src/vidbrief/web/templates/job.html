@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{% if video %}{{ video.title }} · {% endif %}vidbrief{% endblock %}
+{% block head %}
+  {% if running %}<noscript><meta http-equiv="refresh" content="3"></noscript>{% endif %}
+  <script src="/static/vendor/htmx-ext-sse-2.2.4.min.js" integrity="sha384-A986SAtodyH8eg8x8irJnYUk7i9inVQqYigD6qZ9evobksGNIXfeFvDwLSHcp31N" defer></script>{# pragma: allowlist secret #}
+{% endblock %}
+{% block content %}
+<section class="wrap">
+  <div class="page">
+    {% if running %}
+    <div id="job-live" hx-ext="sse" sse-connect="/jobs/{{ job.job_id }}/events" sse-swap="progress" sse-close="end">
+      {% include "partials/job_body.html" %}
+    </div>
+    {% else %}
+    <div id="job-live">
+      {% include "partials/job_body.html" %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

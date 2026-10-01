@@ -1,0 +1,65 @@
+<div class="video">
+  <div class="thumb">
+    {% if video and video.thumbnail_url %}<img src="{{ video.thumbnail_url }}" alt="" width="480" height="270">{% endif %}
+    {% if video_length %}<span class="dur mono">{{ video_length }}</span>{% endif %}
+  </div>
+  <div>
+    {% if video %}
+    <h2>{{ video.title }}</h2>
+    {% elif running %}
+    <h2 class="pending">Looking up the video</h2>
+    {% else %}
+    <h2 class="pending">Video <code>{{ job.video_id.value }}</code></h2>
+    {% endif %}
+    <div class="tags mono">
+      <span class="tag" lang="{{ language.code }}">{{ language.label }}</span>
+      {% if source %}<span class="tag">{{ source }}</span>{% endif %}
+      {% if job.status == "done" %}<span class="tag">Done in {{ took }}</span>{% endif %}
+    </div>
+  </div>
+</div>
+
+{% if job.status == "done" %}
+{% set summary = job.result.summary %}
+<p class="label mono">TL;DR</p>
+<p class="tldr">{{ summary.tldr }}</p>
+<p class="label mono">Key points</p>
+<ol class="points">
+  {% for point in summary.key_points %}
+  <li><span>{{ point }}</span></li>
+  {% endfor %}
+</ol>
+<div class="result-actions">
+  <a class="btn btn-ghost" href="/">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New video
+  </a>
+</div>
+{% else %}
+<div class="status-head">
+  <h3>{% if job.status == "failed" %}That didn't work{% else %}Working on it{% endif %}</h3>
+  <span class="clock mono"{% if running %} data-elapsed="{{ elapsed_seconds }}"{% endif %}>{{ elapsed_clock }}</span>
+</div>
+<ol class="stages">
+  {% for row in timeline %}
+  <li class="stage {{ row.state }}">
+    <span class="marker" aria-hidden="true">
+      {% if row.state == "done" %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg>{% elif row.state == "failed" %}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>{% endif %}
+    </span>
+    <div>
+      <div class="name">{{ row.label }}</div>
+      {% if row.note %}<div class="note">{{ row.note }}</div>{% endif %}
+      {% if row.percent is not none %}<progress class="bar" value="{{ row.percent }}" max="100">{{ row.percent }}%</progress>{% endif %}
+    </div>
+    <span class="meta mono">{{ row.duration or row.count or "" }}</span>
+  </li>
+  {% endfor %}
+</ol>
+{% if job.status == "failed" %}
+<div class="failure" role="alert">
+  <p>{{ job.error }}</p>
+  <a class="btn btn-primary" href="/">Try another link</a>
+</div>
+{% else %}
+<p class="aside-note">You can close this tab. The summary stays at this address for an hour after it finishes.</p>
+{% endif %}
+{% endif %}
