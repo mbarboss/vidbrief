@@ -120,6 +120,15 @@ class UnsupportedLanguageError(VidbriefError):
     _user_message = "Please choose one of the supported summary languages."
 
 
+class TooManyJobsError(VidbriefError):
+    """Raised when a summary is requested while the concurrent job limit is reached."""
+
+    _user_message = "Another summary is still running. Try again when it finishes."
+
+    def __init__(self) -> None:
+        super().__init__("too_many_jobs")
+
+
 def _describe_limit(seconds: int) -> str:
     if seconds % 60 == 0:
         return f"{seconds // 60} minutes"
