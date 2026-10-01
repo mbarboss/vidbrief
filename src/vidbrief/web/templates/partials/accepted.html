@@ -1,0 +1,7 @@
+<div class="card accepted" id="summary-panel">
+  <p class="eyebrow mono">Link checked</p>
+  <h2>Video <code>{{ accepted.video_id }}</code> is ready</h2>
+  <p>The summary will be written in <b lang="{{ accepted.language.code }}">{{ accepted.language.label }}</b>. Summaries from this page arrive in the next update. Until then, the same request works from the terminal:</p>
+  <pre class="mono">uv run vidbrief https://youtu.be/{{ accepted.video_id }} --language {{ accepted.language.code }}</pre>
+  <a class="btn btn-ghost" href="/">Try another link</a>
+</div>

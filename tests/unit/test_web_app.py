@@ -103,3 +103,11 @@ def test_ipv6_bind_address_accepts_its_bracketed_host(make_settings: SettingsFac
     response = TestClient(app, base_url="http://[::1]:8000").get("/healthz")
 
     assert response.status_code == 200
+
+
+def test_http_errors_are_plain_text(client: TestClient) -> None:
+    response = client.get("/missing")
+
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("text/plain")
+    assert response.text == "Not Found"
