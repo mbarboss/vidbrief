@@ -63,6 +63,17 @@ class TestJsonFormat:
         [record] = _records(stream)
         assert record["path"] == str(path)
 
+    def test_drops_the_terminal_colored_copy_uvicorn_attaches(self, stream: io.StringIO) -> None:
+        logger.info(
+            "Started server process [%d]",
+            42,
+            extra={"color_message": "Started server process [\x1b[36m%d\x1b[0m]"},
+        )
+
+        [record] = _records(stream)
+        assert "color_message" not in record
+        assert record["message"] == "Started server process [42]"
+
     def test_keeps_numbers_and_booleans_as_json_values(self, stream: io.StringIO) -> None:
         logger.info("done", extra={"attempt": 2, "elapsed_seconds": 1.5, "truncated": False})
 
