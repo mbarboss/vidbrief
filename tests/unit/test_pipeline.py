@@ -167,7 +167,7 @@ class Harness:
 
     @property
     def stages(self) -> list[PipelineStage]:
-        return [event.stage for event in self.events if event.step is None]
+        return [event.stage for event in self.events if event.step is None and event.video is None]
 
 
 class TestCaptionsPath:
@@ -199,6 +199,7 @@ class TestCaptionsPath:
 
         assert harness.events == [
             Progress(PipelineStage.CHECKING_VIDEO),
+            Progress(PipelineStage.CHECKING_VIDEO, video=METADATA),
             Progress(PipelineStage.FETCHING_CAPTIONS),
             Progress(PipelineStage.SUMMARIZING),
             Progress(PipelineStage.SUMMARIZING, step=1, total=1),
@@ -278,6 +279,7 @@ class TestAudioFallback:
 
         assert harness.events == [
             Progress(PipelineStage.CHECKING_VIDEO),
+            Progress(PipelineStage.CHECKING_VIDEO, video=METADATA),
             Progress(PipelineStage.FETCHING_CAPTIONS),
             Progress(PipelineStage.PREPARING_AUDIO),
             Progress(PipelineStage.TRANSCRIBING),
@@ -318,6 +320,8 @@ class TestFailures:
         assert harness.captions.calls == []
         assert harness.audio.calls == []
         assert harness.stages == [PipelineStage.CHECKING_VIDEO]
+        # Only videos that will be summarized are announced to the UI.
+        assert all(event.video is None for event in harness.events)
 
     @pytest.mark.parametrize(
         ("options", "error_type"),

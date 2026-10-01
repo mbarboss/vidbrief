@@ -41,6 +41,7 @@ class FakeRunner:
     ) -> PipelineResult:
         self.calls.append((video_id, language))
         on_progress(Progress(PipelineStage.CHECKING_VIDEO))
+        on_progress(Progress(PipelineStage.CHECKING_VIDEO, video=RESULT.metadata))
         on_progress(Progress(PipelineStage.TRANSCRIBING, step=1, total=2))
         on_progress(Progress(PipelineStage.SUMMARIZING, step=2, total=5))
         if isinstance(self._outcome, BaseException):

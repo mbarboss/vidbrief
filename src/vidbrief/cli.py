@@ -106,7 +106,7 @@ def _summarize(
     err: TextIO,
 ) -> int:
     def show(progress: Progress) -> None:
-        if progress.stage in _STAGE_LABELS:
+        if progress.stage in _STAGE_LABELS and progress.video is None:
             print(f"{_describe(progress)}...", file=err, flush=True)
 
     try:
