@@ -182,18 +182,6 @@ class TestHomePage:
 
 
 class TestSubmitWithHtmx:
-    def test_a_valid_link_replaces_the_form(self, client: TestClient) -> None:
-        response = _submit(client, VALID_URL, "ja")
-
-        assert response.status_code == 200
-        assert response.headers["hx-retarget"] == "#summary-form"
-        assert response.headers["hx-reswap"] == "outerHTML"
-        assert "<code>jNQXAC9IVRw</code>" in response.text
-        assert "https://youtu.be/jNQXAC9IVRw --language ja" in response.text
-        assert "VideoId" not in response.text
-        assert "日本語" in response.text
-        assert Page(response.text).inline_code == []
-
     def test_an_invalid_link_returns_only_the_error_message(self, client: TestClient) -> None:
         response = _submit(client, "https://evil.example/<script>alert(1)</script>")
 
@@ -234,24 +222,7 @@ class TestSubmitWithHtmx:
         assert response.text == "The form expired. Reload the page and try again."
 
 
-def test_accepted_requests_log_the_plain_video_id(
-    client: TestClient, caplog: pytest.LogCaptureFixture
-) -> None:
-    with caplog.at_level(logging.INFO, logger="vidbrief.web.routes"):
-        _submit(client, VALID_URL)
-
-    assert [getattr(r, "video_id", None) for r in caplog.records] == ["jNQXAC9IVRw"]
-
-
 class TestSubmitWithoutJavaScript:
-    def test_a_valid_link_renders_the_full_page(self, client: TestClient) -> None:
-        response = _submit(client, VALID_URL, htmx=False)
-
-        assert response.status_code == 200
-        assert "<html" in response.text
-        assert "<code>jNQXAC9IVRw</code>" in response.text
-        assert not Page(response.text).find("form", id="summary-form")
-
     def test_an_invalid_link_renders_the_form_with_the_error(self, client: TestClient) -> None:
         response = _submit(client, "not a link <b>bold</b>", htmx=False)
 

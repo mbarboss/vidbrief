@@ -2,26 +2,38 @@
 
 import logging
 import mimetypes
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from vidbrief.config import Settings
-from vidbrief.domain.errors import VidbriefError
+from vidbrief.domain.errors import TooManyJobsError, VidbriefError
 from vidbrief.domain.languages import SUPPORTED_SUMMARY_LANGUAGES, summary_language_name
+from vidbrief.domain.models import TranscriptSource
 from vidbrief.domain.video import parse_youtube_url
 from vidbrief.web.csrf import CSRF_FIELD, CsrfProtector, require_csrf
+from vidbrief.web.jobs import JobManager, JobSnapshot, JobStatus
 from vidbrief.web.languages import LANGUAGE_OPTIONS
 from vidbrief.web.server import url_host
+from vidbrief.web.timeline import build_timeline, format_clock, format_seconds
 
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 _TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 _LANGUAGES_BY_CODE = {option.code: option for option in LANGUAGE_OPTIONS}
+_SOURCE_LABELS = {
+    TranscriptSource.MANUAL_CAPTIONS: "From captions",
+    TranscriptSource.AUTO_CAPTIONS: "From auto captions",
+    TranscriptSource.SPEECH_TO_TEXT: "From the audio",
+}
+# Keeps idle connections alive through the browser and any local proxy.
+_SSE_PING_SECONDS = 15
 
 # Windows takes MIME types from the registry, where .js is sometimes text/plain; with
 # nosniff, browsers would then refuse to run the scripts.
@@ -44,37 +56,73 @@ def create_summary(
     url: Annotated[str, Form()] = "",
     language: Annotated[str, Form()] = "",
 ) -> Response:
-    """Validate a summary request.
+    """Validate a summary request and start its job.
 
-    HTMX requests get fragments: only the error text on failure (status 422), or a panel
-    that replaces the form on success. Plain form posts get the whole page back, so the
-    form also works without JavaScript. Raw input is never echoed back.
+    HTMX requests get ``HX-Redirect`` to the job page, or only the error text (422, or 429
+    when another summary is running) to show under the field. Plain form posts get a 303
+    redirect or the whole page with the error, so the form works without JavaScript. Raw
+    input is never echoed back.
     """
     from_htmx = request.headers.get("hx-request") == "true"
     try:
         video_id = parse_youtube_url(url)
         summary_language_name(language)
+        job_id = _jobs(request).submit(video_id, language)
     except VidbriefError as error:
         logger.info("summary request rejected", extra={"reason": error.reason})
+        status_code = 429 if isinstance(error, TooManyJobsError) else 422
         if from_htmx:
             return _TEMPLATES.TemplateResponse(
                 request,
                 "partials/form_error.html",
                 {"message": error.user_message},
-                status_code=422,
+                status_code=status_code,
             )
-        return _home_page(request, error=error.user_message, language=language, status_code=422)
-
-    logger.info("summary request accepted", extra={"video_id": video_id.value})
-    accepted = {"video_id": video_id.value, "language": _LANGUAGES_BY_CODE[language]}
-    if from_htmx:
-        return _TEMPLATES.TemplateResponse(
-            request,
-            "partials/accepted.html",
-            {"accepted": accepted},
-            headers={"HX-Retarget": "#summary-form", "HX-Reswap": "outerHTML"},
+        return _home_page(
+            request, error=error.user_message, language=language, status_code=status_code
         )
-    return _home_page(request, accepted=accepted)
+
+    job_url = f"/jobs/{job_id}"
+    if from_htmx:
+        return Response(headers={"HX-Redirect": job_url})
+    return RedirectResponse(job_url, status_code=303)
+
+
+@router.get("/jobs/{job_id}", response_class=HTMLResponse)
+def job_page(request: Request, job_id: str) -> Response:
+    """Show a job: live progress while it runs, then its summary or its error."""
+    jobs = _jobs(request)
+    job = jobs.get(job_id)
+    if job is None:
+        return _TEMPLATES.TemplateResponse(
+            request, "job_missing.html", _page_context(request), status_code=404
+        )
+    snapshot = job.snapshot()
+    return _TEMPLATES.TemplateResponse(
+        request, "job.html", {**_page_context(request), **_job_context(snapshot, jobs.now())}
+    )
+
+
+@router.get("/jobs/{job_id}/events", response_model=None)
+def job_events(request: Request, job_id: str) -> Response:
+    """Stream the job's rendered state as Server-Sent Events until it finishes.
+
+    Every event carries the whole job body, so a reconnecting browser is never out of
+    date. A final ``end`` event tells HTMX to close the connection.
+    """
+    jobs = _jobs(request)
+    job = jobs.get(job_id)
+    if job is None:
+        return PlainTextResponse("Not Found", status_code=404)
+    body = _TEMPLATES.env.get_template("partials/job_body.html")
+
+    async def events() -> AsyncIterator[ServerSentEvent]:
+        async for snapshot in job.watch():
+            html = body.render(_job_context(snapshot, jobs.now()))
+            yield ServerSentEvent(html, event="progress")
+        yield ServerSentEvent("", event="end")
+
+    return EventSourceResponse(events(), ping=_SSE_PING_SECONDS)
 
 
 def describe_duration(seconds: int) -> str:
@@ -90,11 +138,36 @@ def _plural(count: int, unit: str) -> str:
     return f"{count} {unit}" if count == 1 else f"{count} {unit}s"
 
 
+def _jobs(request: Request) -> JobManager:
+    jobs: JobManager = request.app.state.jobs
+    return jobs
+
+
+def _page_context(request: Request) -> dict[str, Any]:
+    settings: Settings = request.app.state.settings
+    return {"address": f"{url_host(settings.host)}:{settings.port}"}
+
+
+def _job_context(snapshot: JobSnapshot, now: float) -> dict[str, Any]:
+    video = snapshot.result.metadata if snapshot.result else snapshot.video
+    return {
+        "job": snapshot,
+        "running": snapshot.status is JobStatus.RUNNING,
+        "video": video,
+        "video_length": format_clock(video.duration_seconds) if video else None,
+        "timeline": build_timeline(snapshot),
+        "elapsed_seconds": int(snapshot.elapsed_seconds(now)),
+        "elapsed_clock": format_clock(int(snapshot.elapsed_seconds(now))),
+        "took": format_seconds(snapshot.elapsed_seconds(now)),
+        "language": _LANGUAGES_BY_CODE[snapshot.language],
+        "source": _SOURCE_LABELS[snapshot.result.transcript_source] if snapshot.result else None,
+    }
+
+
 def _home_page(
     request: Request,
     *,
     error: str | None = None,
-    accepted: dict[str, Any] | None = None,
     language: str | None = None,
     status_code: int = 200,
 ) -> Response:
@@ -106,14 +179,13 @@ def _home_page(
         request,
         "index.html",
         {
-            "address": f"{url_host(settings.host)}:{settings.port}",
+            **_page_context(request),
             "max_duration": describe_duration(settings.max_video_duration_seconds),
             "languages": LANGUAGE_OPTIONS,
             "selected_language": selected or settings.default_summary_language,
             "csrf_field": CSRF_FIELD,
             "csrf_token": token.value,
             "error": error,
-            "accepted": accepted,
         },
         status_code=status_code,
     )

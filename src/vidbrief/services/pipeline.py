@@ -103,6 +103,7 @@ class SummaryPipeline:
         stages.enter(PipelineStage.CHECKING_VIDEO)
         metadata = self._metadata_provider.fetch_metadata(video_id)
         ensure_summarizable(metadata, self._max_duration_seconds)
+        stages.report(Progress(PipelineStage.CHECKING_VIDEO, video=metadata))
 
         transcript = self._transcript(metadata, stages)
 

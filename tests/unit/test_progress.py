@@ -8,6 +8,7 @@ def test_stage_level_events_have_no_step_counts() -> None:
 
     assert progress.step is None
     assert progress.total is None
+    assert progress.video is None
 
 
 def test_ignore_progress_accepts_any_event() -> None:

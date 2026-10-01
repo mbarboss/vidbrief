@@ -50,6 +50,26 @@
     }
   });
 
+  // Elapsed time of a running job, counted on from the value the server rendered. HTMX
+  // replaces the element on every update, and each new one starts from its own value.
+  const clockStarts = new WeakMap();
+
+  const formatClock = (total) => {
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = String(total % 60).padStart(2, "0");
+    return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}` : `${minutes}:${seconds}`;
+  };
+
+  setInterval(() => {
+    for (const clock of document.querySelectorAll("[data-elapsed]")) {
+      if (!clockStarts.has(clock)) {
+        clockStarts.set(clock, Date.now() - Number(clock.dataset.elapsed) * 1000);
+      }
+      clock.textContent = formatClock(Math.floor((Date.now() - clockStarts.get(clock)) / 1000));
+    }
+  }, 1000);
+
   showPasteButtons(document);
   document.addEventListener("htmx:load", (event) => showPasteButtons(event.target));
 })();

@@ -9,6 +9,7 @@ from vidbrief.domain.errors import (
     MissingDependencyError,
     NoSpeechDetectedError,
     RateLimitedError,
+    TooManyJobsError,
     UnsupportedLanguageError,
     VidbriefError,
     VideoDurationUnknownError,
@@ -30,6 +31,7 @@ from vidbrief.domain.errors import (
         NoSpeechDetectedError("no_speech"),
         UnsupportedLanguageError("unsupported_language"),
         MissingDependencyError("deno"),
+        TooManyJobsError(),
     ],
     ids=type,
 )

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true,"historyCacheSize":0,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"403","swap":true,"error":true},{"code":"422","swap":true},{"code":"[45]..","swap":false,"error":true}]}'>
+  <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true,"historyCacheSize":0,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"403","swap":true,"error":true},{"code":"422","swap":true},{"code":"429","swap":true},{"code":"[45]..","swap":false,"error":true}]}'>
   <title>{% block title %}vidbrief{% endblock %}</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="/static/fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
@@ -12,6 +12,7 @@
   <script src="/static/js/theme.js"></script>
   <script src="/static/vendor/htmx-2.0.11.min.js" integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg" defer></script>{# pragma: allowlist secret #}
   <script src="/static/js/app.js" defer></script>
+  {% block head %}{% endblock %}
 </head>
 <body>
   <header class="top">

@@ -4,6 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
+from vidbrief.domain.models import VideoMetadata
+
 
 class PipelineStage(StrEnum):
     """The steps of the pipeline, in the order they can happen."""
@@ -22,12 +24,15 @@ class Progress:
 
     A stage starts with an event without counts; long stages may follow up with
     ``step`` of ``total`` events. For summaries ``total`` is an estimate that can change
-    between events.
+    between events. Once a video passes the eligibility checks, one more
+    ``CHECKING_VIDEO`` event carries its metadata in ``video``, so a UI can show what is
+    being summarized before the summary exists.
     """
 
     stage: PipelineStage
     step: int | None = None
     total: int | None = None
+    video: VideoMetadata | None = None
 
 
 ProgressCallback = Callable[[Progress], None]

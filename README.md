@@ -172,22 +172,26 @@ Then open `http://127.0.0.1:8000` (or your `VIDBRIEF_HOST`:`VIDBRIEF_PORT`); Ctr
 the server. It checks for ffmpeg, ffprobe and Deno before starting and logs JSON at
 `VIDBRIEF_LOG_LEVEL`.
 
-The home page takes a link and a summary language and checks both; running the summary from
-the page arrives in the next update, so for now it shows the equivalent command. The page
-follows the system's light or dark theme (the header button switches and remembers it),
-works on phones, and the form also works with JavaScript disabled.
+Paste a link, pick the summary language and press Summarize. The job page shows live
+progress (each step with its time, plus a counter for transcription and summary requests)
+and then the TL;DR and key points. Its address works for an hour after the summary
+finishes, so the tab can be closed and reopened; jobs live in memory and are lost when the
+server stops. Only `VIDBRIEF_MAX_CONCURRENT_JOBS` summaries run at once and further requests
+are refused until one finishes. The pages follow the system's light or dark theme (the
+header button switches and remembers it), work on phones, and also work with JavaScript
+disabled (the job page then refreshes itself every few seconds).
 
 ### Command line
 
-Until the web interface is ready, videos can be summarized from the terminal:
+Videos can also be summarized from the terminal:
 
 ```bash
 uv run vidbrief "https://youtu.be/jNQXAC9IVRw" --language pt-BR
 uv run vidbrief "https://youtu.be/jNQXAC9IVRw" > summary.md   # save to a file
 ```
 
-Progress is shown on stderr (for example `Transcribing the audio (2/5)...` or
-`Summarizing (3/~9)...`, where `~` marks an estimate) and the summary is printed to stdout
+Progress is shown on stderr (for example `Transcribing (2/5)...` or
+`Writing the summary (3/~9)...`, where `~` marks an estimate) and the summary is printed to stdout
 as Markdown. `--language` accepts the allowlisted codes (default:
 `VIDBRIEF_DEFAULT_SUMMARY_LANGUAGE`) and `--verbose` shows JSON logs at
 `VIDBRIEF_LOG_LEVEL`. The exit status is 0 on success, 1 when the video cannot be
@@ -207,7 +211,7 @@ All settings are read from environment variables or `.env`. See [`.env.example`]
 | `VIDBRIEF_AUDIO_CHUNK_MAX_MB` | `24` | Max audio chunk size sent to Groq, in decimal MB |
 | `VIDBRIEF_SUMMARY_MAX_REQUEST_TOKENS` | — (automatic) | Fixed token budget (prompt + answer) per summary request, 2000 to 131072; unset follows the limit Groq reports |
 | `VIDBRIEF_REQUEST_TIMEOUT_SECONDS` | `120` | Timeout for external API calls |
-| `VIDBRIEF_MAX_CONCURRENT_JOBS` | `1` | Parallel summarization jobs |
+| `VIDBRIEF_MAX_CONCURRENT_JOBS` | `1` | Summaries that can run at once in the web server, 1 to 4 |
 | `VIDBRIEF_HOST` | `127.0.0.1` | Bind address (loopback only) |
 | `VIDBRIEF_PORT` | `8000` | HTTP port |
 | `VIDBRIEF_LOG_LEVEL` | `INFO` | Log verbosity |
@@ -220,6 +224,7 @@ HTMX hash is pinned in the tests and in the page's `integrity` attribute):
 | Asset | Version | License |
 |---|---|---|
 | [HTMX](https://htmx.org/) | 2.0.11 | 0BSD |
+| [htmx SSE extension](https://htmx.org/extensions/sse/) | 2.2.4 | 0BSD |
 | [Bricolage Grotesque](https://github.com/ateliertriay/bricolage) (variable, Latin) | Fontsource 5.3.0 | SIL OFL 1.1 |
 | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (variable, Latin) | Fontsource 5.3.0 | SIL OFL 1.1 |
 
@@ -269,6 +274,7 @@ quota and a few hundred chat tokens.
     anti-framing headers and `Cache-Control: no-store`;
   - API docs are disabled, the `Server` header and access log are off and proxy headers are
     ignored.
+  - job pages use unguessable IDs, and video titles and summaries are always escaped.
 - LLM output is sanitized before rendering (XSS protection). In the Markdown report, the
   video title and the summary are flattened to single lines, stripped of control and
   bidirectional characters and escaped, so they cannot inject links, HTML or terminal

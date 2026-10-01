@@ -296,21 +296,206 @@ h1 em { font-style: normal; color: var(--accent); }
 
 .hint { color: var(--muted); font-size: 14px; }
 
-/* Temporary panel shown after a link is accepted */
+/* Job page: video strip */
 
-.accepted h2 { margin: 0 0 12px; font-size: 26px; line-height: 1.2; letter-spacing: -0.02em; }
-.accepted p { margin: 0 0 16px; color: var(--muted); }
-.accepted b { color: var(--ink); font-weight: 600; }
-.accepted code { font: 600 0.85em var(--mono); }
-.accepted pre {
-  margin: 0 0 24px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--bg);
-  white-space: pre-wrap;
+.page { max-width: 760px; margin: 0 auto; padding: 56px 0 96px; }
+
+.video {
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--line);
+}
+.thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.thumb .dur {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.78);
+  color: #ffffff;
+  font-size: 11px;
+}
+
+.video h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
+.video h2.pending { color: var(--faint); }
+.video h2 code { font: 600 0.85em var(--mono); }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.tag {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* Job page: progress timeline */
+
+.status-head { display: flex; justify-content: space-between; align-items: baseline; margin: 36px 0 20px; }
+.status-head h3 { margin: 0; font-size: 28px; font-weight: 650; letter-spacing: -0.025em; }
+.clock { color: var(--muted); font-size: 15px; font-variant-numeric: tabular-nums; }
+
+.stages { margin: 0; padding: 0; list-style: none; }
+.stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 14px 0;
+}
+.stage:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 40px;
+  bottom: -6px;
+  width: 2px;
+  background: var(--line);
+}
+.stage.done:not(:last-child)::before { background: var(--ink); }
+
+.marker {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--bg);
+}
+.stage.done .marker { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+.stage.current .marker { border-color: var(--accent); }
+.stage.current .marker::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.stage.failed .marker { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+
+@keyframes pulse { 50% { transform: scale(0.55); opacity: 0.5; } }
+
+.stage .name { padding-top: 2px; font-size: 17px; font-weight: 550; }
+.stage.todo .name { color: var(--faint); font-weight: 450; }
+.stage.failed .name { color: var(--accent); }
+.stage .note { margin-top: 2px; color: var(--muted); font-size: 14px; }
+.stage .meta { padding-top: 5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+progress.bar {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: 6px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--line);
+  color: var(--accent);
+  appearance: none;
+}
+progress.bar::-webkit-progress-bar { background: var(--line); }
+progress.bar::-webkit-progress-value { background: var(--accent); border-radius: 999px; transition: width 0.4s; }
+progress.bar::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
+
+.aside-note {
+  margin: 28px 0 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.failure {
+  margin-top: 28px;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+.failure p { margin: 0 0 16px; }
+
+/* Job page: result */
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 40px 0 14px;
+  color: var(--faint);
+  text-transform: uppercase;
+}
+.label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+.tldr {
+  margin: 0;
+  padding-left: 22px;
+  border-left: 3px solid var(--accent);
+  font-size: clamp(22px, 2.6vw, 27px);
+  font-weight: 500;
+  line-height: 1.38;
+  letter-spacing: -0.015em;
+  text-wrap: pretty;
+}
+
+.points { margin: 0; padding: 0; list-style: none; counter-reset: point; }
+.points li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  counter-increment: point;
+  text-wrap: pretty;
+}
+.points li::before {
+  content: counter(point, decimal-leading-zero);
+  padding-top: 4px;
+  color: var(--accent);
+  font: 500 13px var(--mono);
+}
+.points li:last-child { border-bottom: 0; }
+
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+/* Missing job */
+
+.missing h1 { font-size: clamp(34px, 5vw, 52px); }
+.missing .lead { margin-bottom: 32px; }
 
 /* Footer */
 
@@ -339,6 +524,13 @@ footer a:hover { color: var(--ink); }
   .btn-primary { width: 100%; }
   .btn-primary kbd { display: none; }
   footer .wrap { flex-direction: column; gap: 4px; }
+  .page { padding: 28px 0 64px; }
+  .video { grid-template-columns: 112px minmax(0, 1fr); gap: 14px; padding-bottom: 20px; }
+  .video h2 { font-size: 17px; }
+  .tags { margin-top: 8px; }
+  .status-head h3 { font-size: 23px; }
+  .tldr { padding-left: 16px; }
+  .points li { grid-template-columns: 34px minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

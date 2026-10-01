@@ -13,23 +13,17 @@ from vidbrief.composition import build_pipeline
 from vidbrief.config import LogLevel, Settings, get_settings
 from vidbrief.domain.errors import VidbriefError
 from vidbrief.domain.languages import SUPPORTED_SUMMARY_LANGUAGES
-from vidbrief.domain.progress import PipelineStage, Progress
+from vidbrief.domain.progress import Progress
 from vidbrief.domain.video import parse_youtube_url
 from vidbrief.logging_config import configure_logging
 from vidbrief.services.pipeline import SummaryRunner
+from vidbrief.services.progress_text import STAGE_LABELS, describe
 from vidbrief.services.report import to_markdown
 from vidbrief.web.app import create_app
 from vidbrief.web.server import Server, run_server, server_url
 
 logger = logging.getLogger(__name__)
 
-_STAGE_LABELS = {
-    PipelineStage.CHECKING_VIDEO: "Checking the video",
-    PipelineStage.FETCHING_CAPTIONS: "Fetching captions",
-    PipelineStage.PREPARING_AUDIO: "Downloading and converting the audio",
-    PipelineStage.TRANSCRIBING: "Transcribing the audio",
-    PipelineStage.SUMMARIZING: "Summarizing",
-}
 _EXIT_FAILURE = 1
 _EXIT_CONFIG_ERROR = 2
 _EXIT_INTERRUPTED = 130
@@ -106,8 +100,8 @@ def _summarize(
     err: TextIO,
 ) -> int:
     def show(progress: Progress) -> None:
-        if progress.stage in _STAGE_LABELS:
-            print(f"{_describe(progress)}...", file=err, flush=True)
+        if progress.stage in STAGE_LABELS and progress.video is None:
+            print(f"{describe(progress)}...", file=err, flush=True)
 
     try:
         video_id = parse_youtube_url(url)
@@ -171,12 +165,3 @@ def _serve_parser() -> argparse.ArgumentParser:
         prog="vidbrief serve",
         description="Start the web interface on VIDBRIEF_HOST and VIDBRIEF_PORT.",
     )
-
-
-def _describe(progress: Progress) -> str:
-    label = _STAGE_LABELS[progress.stage]
-    if progress.step is None or progress.total is None:
-        return label
-    # Summary totals are re-estimated as the token budget is learned.
-    approx = "~" if progress.stage is PipelineStage.SUMMARIZING else ""
-    return f"{label} ({progress.step}/{approx}{progress.total})"
