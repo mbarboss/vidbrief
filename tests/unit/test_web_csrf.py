@@ -5,6 +5,7 @@ from typing import Annotated
 
 import pytest
 from fastapi import Depends, FastAPI, Form, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
 from vidbrief.web.csrf import (
@@ -23,8 +24,11 @@ def _app(protector: CsrfProtector) -> FastAPI:
     app.state.csrf = protector
 
     @app.get("/form")
-    def form(request: Request, response: Response) -> dict[str, str]:
-        return {"token": protector.issue(request, response)}
+    def form(request: Request) -> Response:
+        token = protector.token_for(request)
+        response = JSONResponse({"token": token.value})
+        protector.set_cookie(response, token)
+        return response
 
     @app.post("/submit", dependencies=[Depends(require_csrf)])
     def submit(url: Annotated[str, Form()] = "") -> dict[str, str]:
@@ -47,7 +51,7 @@ def _token(client: TestClient) -> str:
     return token
 
 
-class TestIssue:
+class TestTokenFor:
     def test_sets_a_strict_http_only_session_cookie(self, client: TestClient) -> None:
         response = client.get("/form")
 

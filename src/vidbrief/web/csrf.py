@@ -6,6 +6,7 @@ import hmac
 import logging
 import re
 import secrets
+from dataclasses import dataclass
 
 from fastapi import HTTPException, Request, Response
 
@@ -21,6 +22,14 @@ _FORM_CONTENT_TYPES = ("application/x-www-form-urlencoded", "multipart/form-data
 _EXPIRED_MESSAGE = "The form expired. Reload the page and try again."
 
 
+@dataclass(frozen=True)
+class CsrfToken:
+    """A page token and the cookie nonce it was derived from."""
+
+    nonce: str
+    value: str
+
+
 class CsrfProtector:
     """Issue and check CSRF tokens.
 
@@ -33,17 +42,21 @@ class CsrfProtector:
         # forms that were already open.
         self._key = key or secrets.token_bytes(32)
 
-    def issue(self, request: Request, response: Response) -> str:
-        """Return the token to embed in a page, setting the nonce cookie on ``response``.
+    def token_for(self, request: Request) -> CsrfToken:
+        """Return the token to embed in a page for the visitor making ``request``.
 
         An existing well-formed nonce is reused, so pages open in other tabs keep working.
         """
         nonce = request.cookies.get(CSRF_COOKIE)
         if nonce is None or not _NONCE_PATTERN.fullmatch(nonce):
             nonce = secrets.token_urlsafe(_NONCE_BYTES)
+        return CsrfToken(nonce=nonce, value=self._sign(nonce))
+
+    @staticmethod
+    def set_cookie(response: Response, token: CsrfToken) -> None:
+        """Store the nonce behind ``token`` in the visitor's cookie."""
         # Not Secure: the app is served over plain HTTP on loopback.
-        response.set_cookie(CSRF_COOKIE, nonce, path="/", httponly=True, samesite="strict")
-        return self._sign(nonce)
+        response.set_cookie(CSRF_COOKIE, token.nonce, path="/", httponly=True, samesite="strict")
 
     async def verify(self, request: Request) -> bool:
         """Whether ``request`` carries a token that matches its nonce cookie."""
