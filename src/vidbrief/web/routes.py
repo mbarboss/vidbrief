@@ -9,6 +9,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from vidbrief.config import Settings
@@ -16,6 +17,8 @@ from vidbrief.domain.errors import TooManyJobsError, VidbriefError
 from vidbrief.domain.languages import SUPPORTED_SUMMARY_LANGUAGES, summary_language_name
 from vidbrief.domain.models import TranscriptSource
 from vidbrief.domain.video import parse_youtube_url
+from vidbrief.services.inline_markdown import to_inline_html
+from vidbrief.services.report import to_markdown
 from vidbrief.web.csrf import CSRF_FIELD, CsrfProtector, require_csrf
 from vidbrief.web.jobs import JobManager, JobSnapshot, JobStatus
 from vidbrief.web.languages import LANGUAGE_OPTIONS
@@ -42,6 +45,14 @@ mimetypes.add_type("text/css", ".css")
 mimetypes.add_type("font/woff2", ".woff2")
 
 router = APIRouter()
+
+
+def _inline_markdown(text: str) -> Markup:
+    # Safe to mark: to_inline_html escapes everything and nh3 keeps only strong/em/code.
+    return Markup(to_inline_html(text))  # noqa: S704
+
+
+_TEMPLATES.env.filters["inline_markdown"] = _inline_markdown
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -103,6 +114,27 @@ def job_page(request: Request, job_id: str) -> Response:
     )
 
 
+@router.get("/jobs/{job_id}/summary.md", response_model=None)
+def job_markdown(request: Request, job_id: str) -> Response:
+    """Download a finished summary as a Markdown file.
+
+    The file name uses only the video ID, never the untrusted title. Jobs that are still
+    running or that failed get 409.
+    """
+    job = _jobs(request).get(job_id)
+    if job is None:
+        return PlainTextResponse("Not Found", status_code=404)
+    snapshot = job.snapshot()
+    if snapshot.result is None:
+        return PlainTextResponse("The summary is not ready.", status_code=409)
+    filename = f"vidbrief-{snapshot.video_id.value}.md"
+    return Response(
+        to_markdown(snapshot.result),
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/jobs/{job_id}/events", response_model=None)
 def job_events(request: Request, job_id: str) -> Response:
     """Stream the job's rendered state as Server-Sent Events until it finishes.
@@ -161,6 +193,7 @@ def _job_context(snapshot: JobSnapshot, now: float) -> dict[str, Any]:
         "took": format_seconds(snapshot.elapsed_seconds(now)),
         "language": _LANGUAGES_BY_CODE[snapshot.language],
         "source": _SOURCE_LABELS[snapshot.result.transcript_source] if snapshot.result else None,
+        "markdown": to_markdown(snapshot.result) if snapshot.result else None,
     }
 
 

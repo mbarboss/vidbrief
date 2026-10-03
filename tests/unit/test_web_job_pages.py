@@ -2,7 +2,9 @@
 
 import base64
 import hashlib
+import html
 import logging
+import re
 from dataclasses import replace
 
 import pytest
@@ -22,6 +24,7 @@ from tests.unit.test_web_home import BASE_URL, HTMX, Page
 from vidbrief.domain.errors import VideoTooLongError
 from vidbrief.domain.models import Summary, TranscriptSource
 from vidbrief.domain.progress import PipelineStage, Progress
+from vidbrief.services.report import to_markdown
 from vidbrief.web.app import create_app
 from vidbrief.web.csrf import CSRF_FIELD
 from vidbrief.web.jobs import Job, JobManager
@@ -30,6 +33,7 @@ VALID_URL = "https://youtu.be/jNQXAC9IVRw"
 # pragma: allowlist nextline secret
 SSE_SHA384 = "sha384-A986SAtodyH8eg8x8irJnYUk7i9inVQqYigD6qZ9evobksGNIXfeFvDwLSHcp31N"
 HOSTILE = "<script>alert(1)</script>"
+MARKDOWN_TEMPLATE_RE = re.compile(r'<template id="summary-markdown">(.*?)</template>', re.DOTALL)
 
 
 class App:
@@ -188,6 +192,55 @@ class TestJobPage:
         assert "Done in" in response.text
         assert "English" in response.text
 
+    def test_renders_the_summary_formatting_but_nothing_else(
+        self, make_settings: SettingsFactory
+    ) -> None:
+        summary = Summary(
+            VIDEO_ID, "en", "A **key** idea", ("Run `uv sync`", "[x](javascript:alert(1)) *ok*")
+        )
+        app = App(make_settings, ScriptedRunner(outcome=replace(RESULT, summary=summary)))
+        job = app.start()
+
+        html_text = app.client.get(f"/jobs/{job.job_id}").text
+
+        assert '<p class="tldr">A <strong>key</strong> idea</p>' in html_text
+        assert "<span>Run <code>uv sync</code></span>" in html_text
+        assert "<span>[x](javascript:alert(1)) <em>ok</em></span>" in html_text
+        assert not Page(html_text).find("a", href="javascript:alert(1)")
+
+    def test_a_finished_job_offers_copy_download_and_a_new_video(
+        self, make_settings: SettingsFactory
+    ) -> None:
+        summary = Summary(VIDEO_ID, "en", f"Gist {HOSTILE}", ("A **key** point",))
+        result = replace(RESULT, summary=summary)
+        app = App(make_settings, ScriptedRunner(outcome=result))
+        job = app.start()
+
+        html_text = app.client.get(f"/jobs/{job.job_id}").text
+
+        page = Page(html_text)
+        [copy] = page.find("button", **{"data-copy": "summary-markdown"})
+        assert "hidden" in copy
+        [download] = page.find("a", href=f"/jobs/{job.job_id}/summary.md")
+        assert "download" in download
+        [new_video] = page.find("a", href="/", **{"aria-label": "Summarize a new video"})
+        assert new_video["class"] == "btn btn-ghost new-video"
+        [toast] = page.find("div", role="status")
+        assert "data-toast" in toast
+        [markdown] = MARKDOWN_TEMPLATE_RE.findall(html_text)
+        assert HOSTILE not in markdown
+        assert html.unescape(markdown) == to_markdown(result)
+        assert page.inline_code == []
+
+    def test_a_running_job_has_no_result_actions(self, make_settings: SettingsFactory) -> None:
+        app = App(make_settings, hold=True)
+        job = app.start()
+
+        html_text = app.client.get(f"/jobs/{job.job_id}").text
+
+        assert "summary-markdown" not in html_text
+        assert "summary.md" not in html_text
+
     def test_a_failed_job_shows_the_safe_message(self, make_settings: SettingsFactory) -> None:
         app = App(make_settings, ScriptedRunner(outcome=VideoTooLongError(7200)))
         job = app.start()
@@ -222,6 +275,53 @@ class TestJobPage:
         body = app.client.get("/static/vendor/htmx-ext-sse-2.2.4.min.js").content
         digest = base64.b64encode(hashlib.sha384(body).digest()).decode()
         assert f"sha384-{digest}" == SSE_SHA384
+
+
+class TestMarkdownDownload:
+    def test_a_finished_job_downloads_as_a_markdown_file(
+        self, make_settings: SettingsFactory
+    ) -> None:
+        app = App(make_settings)
+        job = app.start()
+
+        response = app.client.get(f"/jobs/{job.job_id}/summary.md")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/markdown; charset=utf-8"
+        assert response.headers["content-disposition"] == (
+            'attachment; filename="vidbrief-jNQXAC9IVRw.md"'
+        )
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert response.text == to_markdown(RESULT)
+
+    def test_a_running_job_has_nothing_to_download_yet(
+        self, make_settings: SettingsFactory
+    ) -> None:
+        app = App(make_settings, hold=True)
+        job = app.start()
+
+        response = app.client.get(f"/jobs/{job.job_id}/summary.md")
+
+        assert response.status_code == 409
+        assert response.headers["content-type"].startswith("text/plain")
+        assert response.text == "The summary is not ready."
+
+    def test_a_failed_job_has_nothing_to_download(self, make_settings: SettingsFactory) -> None:
+        app = App(make_settings, ScriptedRunner(outcome=VideoTooLongError(7200)))
+        job = app.start()
+
+        response = app.client.get(f"/jobs/{job.job_id}/summary.md")
+
+        assert response.status_code == 409
+
+    def test_unknown_jobs_have_no_file(self, make_settings: SettingsFactory) -> None:
+        app = App(make_settings)
+
+        response = app.client.get("/jobs/missing/summary.md")
+
+        assert response.status_code == 404
+        assert response.headers["content-type"].startswith("text/plain")
 
 
 class TestEvents:

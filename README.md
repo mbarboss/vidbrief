@@ -71,7 +71,8 @@ with captions do not use this quota.
 The transcript is summarized by a Groq chat model (`VIDBRIEF_SUMMARY_MODEL`) into a TL;DR
 and 3 to 10 key points, in the language you choose. The model must support strict
 structured outputs (currently `openai/gpt-oss-120b`, `openai/gpt-oss-20b` and
-`qwen/qwen3.8-27b` on Groq).
+`qwen/qwen3.8-27b` on Groq). The model may mark a few key terms in **bold** and code or
+commands as `code`; any other Markdown it writes is shown as plain text.
 
 Groq limits how many tokens each API key can use per minute, counting the prompt plus the
 longest answer a request allows. vidbrief therefore sizes every request to that limit:
@@ -174,7 +175,8 @@ the server. It checks for ffmpeg, ffprobe and Deno before starting and logs JSON
 
 Paste a link, pick the summary language and press Summarize. The job page shows live
 progress (each step with its time, plus a counter for transcription and summary requests)
-and then the TL;DR and key points. Its address works for an hour after the summary
+and then the TL;DR and key points, which can be copied as Markdown or downloaded as a
+`.md` file (`/jobs/<id>/summary.md`). Its address works for an hour after the summary
 finishes, so the tab can be closed and reopened; jobs live in memory and are lost when the
 server stops. Only `VIDBRIEF_MAX_CONCURRENT_JOBS` summaries run at once and further requests
 are refused until one finishes. The pages follow the system's light or dark theme (the
@@ -274,11 +276,14 @@ quota and a few hundred chat tokens.
     anti-framing headers and `Cache-Control: no-store`;
   - API docs are disabled, the `Server` header and access log are off and proxy headers are
     ignored.
-  - job pages use unguessable IDs, and video titles and summaries are always escaped.
-- LLM output is sanitized before rendering (XSS protection). In the Markdown report, the
-  video title and the summary are flattened to single lines, stripped of control and
-  bidirectional characters and escaped, so they cannot inject links, HTML or terminal
-  escape sequences.
+  - job pages use unguessable IDs, and video titles are always escaped.
+- LLM output is untrusted. Summaries are flattened to single lines and stripped of control
+  and bidirectional characters, then parsed with a Markdown subset that only knows bold,
+  italics and code: links, images, raw HTML and block structure stay literal text. The
+  page renders that subset to HTML and passes it through `nh3`, which keeps only
+  `strong`, `em` and `code` without attributes. The Markdown report escapes everything
+  else (and the whole video title), so neither can inject links, HTML or terminal escape
+  sequences.
 
 ## Legal notice
 

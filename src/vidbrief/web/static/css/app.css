@@ -38,6 +38,8 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -215,7 +217,6 @@ h1 em { font-style: normal; color: var(--accent); }
   cursor: pointer;
 }
 .paste:hover { border-color: var(--line-strong); color: var(--ink); }
-.paste[hidden] { display: none; }
 
 .err { min-height: 22px; margin: 8px 2px 14px; color: var(--accent); font-size: 14px; }
 
@@ -482,6 +483,15 @@ progress.bar::-moz-progress-bar { background: var(--accent); border-radius: 999p
 }
 .points li:last-child { border-bottom: 0; }
 
+.tldr strong, .points strong { font-weight: 700; }
+.tldr code, .points code {
+  padding: 0.08em 0.36em;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  font: 500 0.84em var(--mono);
+  overflow-wrap: anywhere;
+}
+
 .result-actions {
   display: flex;
   flex-wrap: wrap;
@@ -491,6 +501,22 @@ progress.bar::-moz-progress-bar { background: var(--accent); border-radius: 999p
   padding-top: 24px;
   border-top: 1px solid var(--line);
 }
+
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  z-index: 20;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--bg);
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+}
+.toast.visible { opacity: 1; transform: translate(-50%, 0); }
 
 /* Missing job */
 
@@ -531,6 +557,24 @@ footer a:hover { color: var(--ink); }
   .status-head h3 { font-size: 23px; }
   .tldr { padding-left: 16px; }
   .points li { grid-template-columns: 34px minmax(0, 1fr); }
+  /* The actions stay within thumb reach while the summary scrolls. */
+  body:has(.result-actions) { padding-bottom: calc(69px + env(safe-area-inset-bottom)); }
+  .result-actions {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 10;
+    flex-wrap: nowrap;
+    margin: 0;
+    padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+    background: var(--surface);
+  }
+  .result-actions .btn { flex: 1; min-width: 0; padding: 0 10px; white-space: nowrap; }
+  .result-actions .btn:not(.new-video) svg { display: none; }
+  .result-actions .new-video { flex: none; width: 44px; padding: 0; }
+  .new-video span { display: none; }
+  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
