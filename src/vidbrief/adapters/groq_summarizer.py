@@ -284,7 +284,8 @@ def _final_system(language_name: str, material: _Material) -> str:
         f"{_rules(material)}\n"
         f'Write in {language_name}. Answer with JSON where "tldr" is two or three sentences '
         'with the core message and "key_points" lists 3 to 10 short, self-contained points '
-        "in the order they come up in the video."
+        "in the order they come up in the video. You may use **bold** for a few key terms "
+        "and `code` for code, commands or file names; use no other formatting."
     )
 
 
