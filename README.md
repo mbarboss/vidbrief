@@ -72,7 +72,8 @@ The transcript is summarized by a Groq chat model (`VIDBRIEF_SUMMARY_MODEL`) int
 and 3 to 10 key points, in the language you choose. The model must support strict
 structured outputs (currently `openai/gpt-oss-120b`, `openai/gpt-oss-20b` and
 `qwen/qwen3.8-27b` on Groq). The model may mark a few key terms in **bold** and code or
-commands as `code`; any other Markdown it writes is shown as plain text.
+commands as `code`; any other Markdown it writes is shown as plain text. It is also asked
+not to use em dashes.
 
 Groq limits how many tokens each API key can use per minute, counting the prompt plus the
 longest answer a request allows. vidbrief therefore sizes every request to that limit:
