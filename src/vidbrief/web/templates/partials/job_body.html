@@ -22,16 +22,23 @@
 {% if job.status == "done" %}
 {% set summary = job.result.summary %}
 <p class="label mono">TL;DR</p>
-<p class="tldr">{{ summary.tldr }}</p>
+<p class="tldr">{{ summary.tldr | inline_markdown }}</p>
 <p class="label mono">Key points</p>
 <ol class="points">
   {% for point in summary.key_points %}
-  <li><span>{{ point }}</span></li>
+  <li><span>{{ point | inline_markdown }}</span></li>
   {% endfor %}
 </ol>
+<template id="summary-markdown">{{ markdown }}</template>
 <div class="result-actions">
-  <a class="btn btn-ghost" href="/">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New video
+  <button class="btn btn-ghost" type="button" data-copy="summary-markdown" hidden>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>Copy
+  </button>
+  <a class="btn btn-ghost" href="/jobs/{{ job.job_id }}/summary.md" download>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download .md
+  </a>
+  <a class="btn btn-ghost new-video" href="/" aria-label="Summarize a new video">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>New video</span>
   </a>
 </div>
 {% else %}

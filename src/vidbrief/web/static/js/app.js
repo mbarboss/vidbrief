@@ -17,10 +17,37 @@
   };
 
   const canPaste = Boolean(navigator.clipboard && navigator.clipboard.readText);
+  const canCopy = Boolean(navigator.clipboard && navigator.clipboard.writeText);
 
-  const showPasteButtons = (scope) => {
-    if (!canPaste) return;
-    for (const button of scope.querySelectorAll("[data-paste]")) button.hidden = false;
+  const showClipboardButtons = (scope) => {
+    if (canPaste) for (const button of scope.querySelectorAll("[data-paste]")) button.hidden = false;
+    if (canCopy) for (const button of scope.querySelectorAll("[data-copy]")) button.hidden = false;
+  };
+
+  let toastTimer;
+
+  const showToast = (message) => {
+    const toast = document.querySelector("[data-toast]");
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add("visible");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.classList.remove("visible");
+      // Emptied so that copying again is announced again.
+      toastTimer = setTimeout(() => { toast.textContent = ""; }, 200);
+    }, 2400);
+  };
+
+  const copy = async (button) => {
+    const source = document.getElementById(button.dataset.copy);
+    if (!source) return;
+    try {
+      await navigator.clipboard.writeText(source.content.textContent);
+      showToast("Copied as Markdown");
+    } catch {
+      showToast("Couldn't copy. Use Download instead.");
+    }
   };
 
   const paste = async (button) => {
@@ -40,6 +67,8 @@
     if (target.closest("[data-theme-toggle]")) toggleTheme();
     const pasteButton = target.closest("[data-paste]");
     if (pasteButton) paste(pasteButton);
+    const copyButton = target.closest("[data-copy]");
+    if (copyButton) copy(copyButton);
   });
 
   // A new attempt should not keep showing the previous error.
@@ -70,6 +99,6 @@
     }
   }, 1000);
 
-  showPasteButtons(document);
-  document.addEventListener("htmx:load", (event) => showPasteButtons(event.target));
+  showClipboardButtons(document);
+  document.addEventListener("htmx:load", (event) => showClipboardButtons(event.target));
 })();

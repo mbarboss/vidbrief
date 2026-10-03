@@ -82,8 +82,21 @@ def test_escapes_markdown_and_html_in_untrusted_text() -> None:
     assert "\\[x\\](javascript:alert(1))" in markdown
     assert "\\*\\*bold\\*\\*" in markdown
     assert "\\`code\\`" in markdown
-    assert "\\# Heading \\| table \\~strike\\~ \\_em\\_" in markdown
+    assert "\\# Heading \\| table \\~strike\\~ *em*" in markdown
     assert "- \\<img src=x onerror=alert(1)\\>" in markdown
+
+
+def test_keeps_the_formatting_the_summary_may_use_but_not_in_the_title() -> None:
+    markdown = _with(
+        title="**Not bold**",
+        tldr="A **key** idea with *nuance*.",
+        points=("Run `uv sync`", "2) numbered"),
+    )
+
+    assert "# \\*\\*Not bold\\*\\*\n" in markdown
+    assert "\nA **key** idea with *nuance*.\n" in markdown
+    assert "- Run `uv sync`\n" in markdown
+    assert "- 2\\) numbered\n" in markdown
 
 
 def test_removes_control_characters() -> None:
