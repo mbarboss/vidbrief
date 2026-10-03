@@ -183,6 +183,11 @@ are refused until one finishes. The pages follow the system's light or dark them
 header button switches and remembers it), work on phones, and also work with JavaScript
 disabled (the job page then refreshes itself every few seconds).
 
+When a summary fails, the job page says what went wrong and, where possible, what to do
+about it (for example checking `GROQ_API_KEY` when Groq refuses the key). Failures that may
+pass, such as Groq being busy or a stream that has not ended yet, offer "Try again", which
+reopens the form with the same link and language filled in.
+
 ### Command line
 
 Videos can also be summarized from the terminal:
@@ -198,6 +203,8 @@ as Markdown. `--language` accepts the allowlisted codes (default:
 `VIDBRIEF_DEFAULT_SUMMARY_LANGUAGE`) and `--verbose` shows JSON logs at
 `VIDBRIEF_LOG_LEVEL`. The exit status is 0 on success, 1 when the video cannot be
 summarized, 2 for invalid arguments or configuration and 130 when cancelled with Ctrl+C.
+Errors are printed as `Error: <what went wrong>`, followed by a line with what to do when
+there is something to do.
 
 ## Configuration
 

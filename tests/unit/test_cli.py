@@ -147,6 +147,7 @@ def test_pipeline_errors_show_the_safe_message(settings: Settings) -> None:
 
     assert run.stderr.getvalue().endswith(
         "Error: This video is longer than 2 hours, the most vidbrief summarizes.\n"
+        "You can raise VIDBRIEF_MAX_VIDEO_DURATION_SECONDS in .env.\n"
     )
     assert run.stdout.getvalue() == ""
 

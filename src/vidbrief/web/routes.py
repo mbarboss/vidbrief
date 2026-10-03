@@ -5,6 +5,7 @@ import mimetypes
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
@@ -13,7 +14,8 @@ from markupsafe import Markup
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from vidbrief.config import Settings
-from vidbrief.domain.errors import TooManyJobsError, VidbriefError
+from vidbrief.domain.durations import describe_duration
+from vidbrief.domain.errors import InvalidVideoUrlError, TooManyJobsError, VidbriefError
 from vidbrief.domain.languages import SUPPORTED_SUMMARY_LANGUAGES, summary_language_name
 from vidbrief.domain.models import TranscriptSource
 from vidbrief.domain.video import parse_youtube_url
@@ -56,9 +58,18 @@ _TEMPLATES.env.filters["inline_markdown"] = _inline_markdown
 
 
 @router.get("/", response_class=HTMLResponse)
-def home(request: Request) -> Response:
-    """Show the form where users paste a link and pick the summary language."""
-    return _home_page(request)
+def home(request: Request, url: str = "", language: str = "") -> Response:
+    """Show the form where users paste a link and pick the summary language.
+
+    ``url`` and ``language`` come from a failed job's "Try again" link and only fill in
+    the form. A link that does not parse and a language outside the allowlist are
+    ignored, never echoed; a valid link is replaced by its canonical form.
+    """
+    try:
+        canonical_url = parse_youtube_url(url).canonical_url if url else None
+    except InvalidVideoUrlError:
+        canonical_url = None
+    return _home_page(request, url=canonical_url, language=language)
 
 
 @router.post("/summaries", response_class=HTMLResponse, dependencies=[Depends(require_csrf)])
@@ -157,19 +168,6 @@ def job_events(request: Request, job_id: str) -> Response:
     return EventSourceResponse(events(), ping=_SSE_PING_SECONDS)
 
 
-def describe_duration(seconds: int) -> str:
-    """Render a duration limit the way people say it, e.g. ``2 hours`` or ``90 minutes``."""
-    if seconds >= 3600 and seconds % 3600 == 0:
-        return _plural(seconds // 3600, "hour")
-    if seconds >= 60:
-        return _plural(seconds // 60, "minute")
-    return _plural(seconds, "second")
-
-
-def _plural(count: int, unit: str) -> str:
-    return f"{count} {unit}" if count == 1 else f"{count} {unit}s"
-
-
 def _jobs(request: Request) -> JobManager:
     jobs: JobManager = request.app.state.jobs
     return jobs
@@ -194,13 +192,20 @@ def _job_context(snapshot: JobSnapshot, now: float) -> dict[str, Any]:
         "language": _LANGUAGES_BY_CODE[snapshot.language],
         "source": _SOURCE_LABELS[snapshot.result.transcript_source] if snapshot.result else None,
         "markdown": to_markdown(snapshot.result) if snapshot.result else None,
+        "retry_url": _retry_url(snapshot) if snapshot.retryable else None,
     }
+
+
+def _retry_url(snapshot: JobSnapshot) -> str:
+    query = urlencode({"url": snapshot.video_id.canonical_url, "language": snapshot.language})
+    return f"/?{query}"
 
 
 def _home_page(
     request: Request,
     *,
     error: str | None = None,
+    url: str | None = None,
     language: str | None = None,
     status_code: int = 200,
 ) -> Response:
@@ -219,6 +224,7 @@ def _home_page(
             "csrf_field": CSRF_FIELD,
             "csrf_token": token.value,
             "error": error,
+            "url": url,
         },
         status_code=status_code,
     )

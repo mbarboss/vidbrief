@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from vidbrief.domain.errors import TooManyJobsError, VidbriefError
+from vidbrief.domain.errors import TooManyJobsError, UnexpectedError, VidbriefError
 from vidbrief.domain.models import VideoMetadata
 from vidbrief.domain.progress import PipelineStage, Progress
 from vidbrief.domain.video import VideoId
@@ -47,7 +47,8 @@ class StageRecord:
 class JobSnapshot:
     """An immutable view of a job, safe to read from any thread.
 
-    ``error`` is already a user-safe message. ``video`` and ``result`` hold untrusted text
+    ``error`` and ``error_hint`` are already user-safe texts, and ``retryable`` says whether
+    the same request may succeed later. ``video`` and ``result`` hold untrusted text
     (title, summary) that templates must escape.
     """
 
@@ -62,6 +63,8 @@ class JobSnapshot:
     result: PipelineResult | None
     error: str | None
     version: int
+    error_hint: str | None = None
+    retryable: bool = False
 
     def elapsed_seconds(self, now: float) -> float:
         """Seconds the job took, or has taken so far when it is still running."""
@@ -136,10 +139,19 @@ class Job:
         now = self._clock()
         self._update(lambda s: replace(s, status=JobStatus.DONE, result=result, finished_at=now))
 
-    def fail(self, message: str) -> None:
-        """Mark the job failed with a message that is safe to show to users."""
+    def fail(self, error: VidbriefError) -> None:
+        """Mark the job failed with the user-safe texts of ``error``."""
         now = self._clock()
-        self._update(lambda s: replace(s, status=JobStatus.FAILED, error=message, finished_at=now))
+        self._update(
+            lambda s: replace(
+                s,
+                status=JobStatus.FAILED,
+                error=error.user_message,
+                error_hint=error.user_hint,
+                retryable=error.retryable,
+                finished_at=now,
+            )
+        )
 
     async def watch(self) -> AsyncGenerator[JobSnapshot]:
         """Yield the current state, then each new state, until the job has finished."""
@@ -258,10 +270,10 @@ class JobManager:
             )
         except VidbriefError as error:
             logger.warning("job failed", extra={**log_extra, "reason": error.reason})
-            job.fail(error.user_message)
+            job.fail(error)
         except Exception:
             logger.exception("job crashed", extra=log_extra)
-            job.fail(VidbriefError("unexpected").user_message)
+            job.fail(UnexpectedError())
         else:
             logger.info("job finished", extra=log_extra)
             job.finish(result)

@@ -111,6 +111,8 @@ def _summarize(
     except VidbriefError as error:
         logger.warning("summary failed", extra={"reason": error.reason})
         print(f"Error: {error.user_message}", file=err)
+        if error.user_hint:
+            print(error.user_hint, file=err)
         return _EXIT_FAILURE
     except KeyboardInterrupt:
         print("Cancelled.", file=err)

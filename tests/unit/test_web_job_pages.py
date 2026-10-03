@@ -21,7 +21,7 @@ from tests.unit.job_fakes import (
     run_inline,
 )
 from tests.unit.test_web_home import BASE_URL, HTMX, Page
-from vidbrief.domain.errors import VideoTooLongError
+from vidbrief.domain.errors import ExternalServiceError, VideoTooLongError
 from vidbrief.domain.models import Summary, TranscriptSource
 from vidbrief.domain.progress import PipelineStage, Progress
 from vidbrief.services.report import to_markdown
@@ -241,17 +241,41 @@ class TestJobPage:
         assert "summary-markdown" not in html_text
         assert "summary.md" not in html_text
 
-    def test_a_failed_job_shows_the_safe_message(self, make_settings: SettingsFactory) -> None:
+    def test_a_permanent_failure_only_offers_another_link(
+        self, make_settings: SettingsFactory
+    ) -> None:
         app = App(make_settings, ScriptedRunner(outcome=VideoTooLongError(7200)))
         job = app.start()
 
-        html = app.client.get(f"/jobs/{job.job_id}").text
+        html_text = app.client.get(f"/jobs/{job.job_id}").text
 
-        assert "This video is longer than 2 hours, the most vidbrief summarizes." in html
-        assert "Looking up the video" not in html
-        assert "<code>jNQXAC9IVRw</code>" in html
-        assert Page(html).find("a", href="/")
-        assert "Try another link" in html
+        assert "This video is longer than 2 hours, the most vidbrief summarizes." in html_text
+        assert '<p class="failure-hint">You can raise VIDBRIEF_MAX_VIDEO_DURATION_SECONDS' in (
+            html_text
+        )
+        assert "Looking up the video" not in html_text
+        assert "<code>jNQXAC9IVRw</code>" in html_text
+        page = Page(html_text)
+        assert page.find("a", href="/", **{"class": "btn btn-primary"})
+        assert "Try another link" in html_text
+        assert "Try again" not in html_text
+
+    def test_a_temporary_failure_offers_to_try_again_with_the_same_choices(
+        self, make_settings: SettingsFactory
+    ) -> None:
+        error = ExternalServiceError("summary_unavailable")
+        app = App(make_settings, ScriptedRunner(outcome=error))
+        job_id = app.jobs.submit(VIDEO_ID, "ja")
+
+        html_text = app.client.get(f"/jobs/{job_id}").text
+
+        assert "Groq isn&#39;t responding right now." in html_text
+        assert "Try again in a few minutes." in html_text
+        page = Page(html_text)
+        retry_url = "/?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DjNQXAC9IVRw&language=ja"
+        [retry] = page.find("a", href=retry_url)
+        assert retry["class"] == "btn btn-primary"
+        assert page.find("a", href="/", **{"class": "btn btn-ghost"})
 
     def test_unknown_jobs_get_a_friendly_404_page(self, make_settings: SettingsFactory) -> None:
         app = App(make_settings)
@@ -346,7 +370,8 @@ class TestEvents:
 
         body = app.client.get(f"/jobs/{job.job_id}/events").text
 
-        assert "This video is longer than 2 hours, the most vidbrief summarizes." in body
+        assert "This video is longer than 2 hours" in body
+        assert "VIDBRIEF_MAX_VIDEO_DURATION_SECONDS" in body
 
     def test_unknown_jobs_have_no_stream(self, make_settings: SettingsFactory) -> None:
         app = App(make_settings)

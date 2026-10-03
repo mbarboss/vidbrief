@@ -122,6 +122,40 @@ class TestHomePage:
         assert "90 minutes" in html
         assert "Running on 127.0.0.1:8123" in html
 
+    def test_a_retry_link_fills_in_the_canonical_link_and_language(
+        self, client: TestClient
+    ) -> None:
+        query = {"url": "youtu.be/jNQXAC9IVRw?t=5", "language": "ja"}
+
+        page = Page(client.get("/", params=query).text)
+
+        [field] = page.find("input", name="url")
+        assert field["value"] == "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+        radios = page.find("input", type="radio", name="language")
+        assert [radio["value"] for radio in radios if "checked" in radio] == ["ja"]
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            {"url": "https://evil.example/<script>", "language": "xx"},
+            {"url": "", "language": ""},
+            {"language": "<b>"},
+        ],
+    )
+    def test_invalid_retry_values_are_ignored_and_never_echoed(
+        self, client: TestClient, query: dict[str, str]
+    ) -> None:
+        response = client.get("/", params=query)
+
+        assert response.status_code == 200
+        page = Page(response.text)
+        [field] = page.find("input", name="url")
+        assert "value" not in field
+        assert "evil.example" not in response.text
+        assert "&lt;b&gt;" not in response.text
+        radios = page.find("input", type="radio", name="language")
+        assert [radio["value"] for radio in radios if "checked" in radio] == ["pt-BR"]
+
     def test_has_no_inline_code_so_the_strict_csp_holds(self, client: TestClient) -> None:
         assert Page(client.get("/").text).inline_code == []
 
@@ -231,19 +265,3 @@ class TestSubmitWithoutJavaScript:
         assert "<b>bold</b>" not in response.text
         assert "not a link" not in response.text
         assert Page(response.text).find("form", id="summary-form")
-
-
-@pytest.mark.parametrize(
-    ("seconds", "expected"),
-    [
-        (7200, "2 hours"),
-        (3600, "1 hour"),
-        (5400, "90 minutes"),
-        (60, "1 minute"),
-        (90, "1 minute"),
-        (45, "45 seconds"),
-        (1, "1 second"),
-    ],
-)
-def test_describe_duration(seconds: int, expected: str) -> None:
-    assert routes.describe_duration(seconds) == expected

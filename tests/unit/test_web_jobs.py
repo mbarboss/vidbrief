@@ -16,7 +16,12 @@ from tests.unit.job_fakes import (
     ScriptedRunner,
     run_inline,
 )
-from vidbrief.domain.errors import TooManyJobsError, VideoTooLongError
+from vidbrief.domain.errors import (
+    TooManyJobsError,
+    UnexpectedError,
+    VideoTooLongError,
+    VideoUnavailableError,
+)
 from vidbrief.domain.progress import PipelineStage, Progress
 from vidbrief.web.jobs import Job, JobManager, JobSnapshot, JobStatus, StageRecord
 
@@ -107,11 +112,13 @@ class TestJobTimeline:
         job.on_progress(Progress(PipelineStage.TRANSCRIBING))
         clock.now += 2
 
-        job.fail("Something went wrong.")
+        job.fail(VideoUnavailableError("private"))
 
         snapshot = job.snapshot()
         assert snapshot.status is JobStatus.FAILED
-        assert snapshot.error == "Something went wrong."
+        assert snapshot.error == "This video is private."
+        assert snapshot.error_hint is None
+        assert not snapshot.retryable
         assert snapshot.stages[-1].finished_at is None
         assert snapshot.finished_at == 102.0
 
@@ -189,7 +196,7 @@ class TestWatch:
 
     def test_a_finished_job_yields_once(self) -> None:
         job = Job("id", VIDEO_ID, "en", clock=FakeClock())
-        job.fail("Nope.")
+        job.fail(UnexpectedError())
 
         async def scenario() -> list[JobStatus]:
             return [snapshot.status async for snapshot in job.watch()]
@@ -258,6 +265,8 @@ class TestJobManager:
         snapshot = manager.get(job_id).snapshot()  # type: ignore[union-attr]
         assert snapshot.status is JobStatus.FAILED
         assert snapshot.error == "This video is longer than 2 hours, the most vidbrief summarizes."
+        assert snapshot.error_hint == "You can raise VIDBRIEF_MAX_VIDEO_DURATION_SECONDS in .env."
+        assert not snapshot.retryable
         [record] = caplog.records
         assert record.reason == "too_long"  # type: ignore[attr-defined]
 
@@ -271,6 +280,8 @@ class TestJobManager:
 
         snapshot = manager.get(job_id).snapshot()  # type: ignore[union-attr]
         assert snapshot.error == "Something unexpected went wrong."
+        assert snapshot.error_hint == "Try again. The server log has the details."
+        assert snapshot.retryable
         assert "internal detail" not in (snapshot.error or "")
         assert caplog.records[0].exc_info is not None
 
