@@ -247,7 +247,7 @@ class TestJobPage:
 
         html = app.client.get(f"/jobs/{job.job_id}").text
 
-        assert "Videos longer than 120 minutes are not supported." in html
+        assert "This video is longer than 2 hours, the most vidbrief summarizes." in html
         assert "Looking up the video" not in html
         assert "<code>jNQXAC9IVRw</code>" in html
         assert Page(html).find("a", href="/")
@@ -346,7 +346,7 @@ class TestEvents:
 
         body = app.client.get(f"/jobs/{job.job_id}/events").text
 
-        assert "Videos longer than 120 minutes are not supported." in body
+        assert "This video is longer than 2 hours, the most vidbrief summarizes." in body
 
     def test_unknown_jobs_have_no_stream(self, make_settings: SettingsFactory) -> None:
         app = App(make_settings)

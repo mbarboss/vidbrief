@@ -146,7 +146,7 @@ def test_pipeline_errors_show_the_safe_message(settings: Settings) -> None:
     assert run(URL) == 1
 
     assert run.stderr.getvalue().endswith(
-        "Error: Videos longer than 120 minutes are not supported.\n"
+        "Error: This video is longer than 2 hours, the most vidbrief summarizes.\n"
     )
     assert run.stdout.getvalue() == ""
 

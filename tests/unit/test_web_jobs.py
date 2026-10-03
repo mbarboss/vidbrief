@@ -257,7 +257,7 @@ class TestJobManager:
 
         snapshot = manager.get(job_id).snapshot()  # type: ignore[union-attr]
         assert snapshot.status is JobStatus.FAILED
-        assert snapshot.error == "Videos longer than 120 minutes are not supported."
+        assert snapshot.error == "This video is longer than 2 hours, the most vidbrief summarizes."
         [record] = caplog.records
         assert record.reason == "too_long"  # type: ignore[attr-defined]
 
@@ -270,7 +270,7 @@ class TestJobManager:
             job_id = manager.submit(VIDEO_ID, "en")
 
         snapshot = manager.get(job_id).snapshot()  # type: ignore[union-attr]
-        assert snapshot.error == "Something went wrong. Please try again."
+        assert snapshot.error == "Something unexpected went wrong."
         assert "internal detail" not in (snapshot.error or "")
         assert caplog.records[0].exc_info is not None
 
