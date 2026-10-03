@@ -441,6 +441,7 @@ progress.bar::-moz-progress-bar { background: var(--accent); border-radius: 999p
   background: color-mix(in srgb, var(--accent) 7%, var(--surface));
 }
 .failure p { margin: 0 0 16px; }
+.failure .failure-hint { margin-top: -10px; color: var(--muted); font-size: 15px; }
 
 /* Job page: result */
 
@@ -547,7 +548,8 @@ footer a:hover { color: var(--ink); }
   .lead { font-size: 16px; }
   .card { padding: 20px; border-radius: 16px; }
   .field-label .mono { display: none; }
-  .btn-primary { width: 100%; }
+  .btn-primary, .failure .btn { width: 100%; }
+  .failure .actions-row { gap: 10px; }
   .btn-primary kbd { display: none; }
   footer .wrap { flex-direction: column; gap: 4px; }
   .page { padding: 28px 0 64px; }

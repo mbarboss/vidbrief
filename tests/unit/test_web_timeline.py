@@ -3,6 +3,7 @@
 import pytest
 
 from tests.unit.job_fakes import RESULT, VIDEO_ID, FakeClock
+from vidbrief.domain.errors import UnexpectedError
 from vidbrief.domain.progress import PipelineStage, Progress
 from vidbrief.web.jobs import Job
 from vidbrief.web.timeline import StageView, build_timeline, format_clock, format_seconds
@@ -102,14 +103,14 @@ def test_a_finished_job_has_every_stage_done() -> None:
 
 def test_a_failed_job_marks_the_stage_that_failed() -> None:
     job, _ = _job((CHECK, 1), (CAPTIONS, 1), (SUMMARY, 2))
-    job.fail("Nope.")
+    job.fail(UnexpectedError())
 
     assert _rows(job)[-1] == ("Writing the summary", "failed", None, None)
 
 
 def test_a_job_that_failed_early_leaves_later_stages_pending() -> None:
     job, _ = _job((CHECK, 1))
-    job.fail("Nope.")
+    job.fail(UnexpectedError())
 
     assert [row.state for row in build_timeline(job.snapshot())] == ["failed", "todo", "todo"]
 

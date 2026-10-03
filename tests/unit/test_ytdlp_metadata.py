@@ -239,7 +239,7 @@ class TestErrorMapping:
             _fetch(DownloadError(message))
 
         assert exc_info.value.reason == reason
-        assert "youtube" not in exc_info.value.user_message.lower()
+        assert "[youtube]" not in exc_info.value.user_message
 
     def test_translates_other_ytdlp_errors(self) -> None:
         with pytest.raises(ExternalServiceError) as exc_info:

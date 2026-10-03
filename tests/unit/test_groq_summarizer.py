@@ -158,6 +158,13 @@ class TestShortTranscript:
         assert "`code`" in system
         assert "no other formatting" in system
 
+    def test_prompt_asks_for_no_em_dashes(self) -> None:
+        completer = FakeCompleter()
+
+        _summarizer(completer).summarize(_transcript("Text."), "en")
+
+        assert "Do not use em dashes" in completer.calls[0].system
+
     def test_requests_a_strict_tldr_and_key_points_schema(self) -> None:
         completer = FakeCompleter()
 

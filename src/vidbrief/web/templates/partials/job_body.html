@@ -64,7 +64,15 @@
 {% if job.status == "failed" %}
 <div class="failure" role="alert">
   <p>{{ job.error }}</p>
-  <a class="btn btn-primary" href="/">Try another link</a>
+  {% if job.error_hint %}<p class="failure-hint">{{ job.error_hint }}</p>{% endif %}
+  <div class="actions-row">
+    {% if retry_url %}
+    <a class="btn btn-primary" href="{{ retry_url }}">Try again</a>
+    <a class="btn btn-ghost" href="/">Try another link</a>
+    {% else %}
+    <a class="btn btn-primary" href="/">Try another link</a>
+    {% endif %}
+  </div>
 </div>
 {% else %}
 <p class="aside-note">You can close this tab. The summary stays at this address for an hour after it finishes.</p>
