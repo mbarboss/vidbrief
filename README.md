@@ -4,24 +4,69 @@
 
 > Paste a YouTube link and get a concise AI-generated summary in your language.
 
-**Status:** 🚧 Work in progress (MVP under development)
+**Status:** feature-complete for local use (web app and command line).
 
-## Features (planned)
+## Features
 
-- [ ] Paste a YouTube URL and preview title, thumbnail and duration
-- [ ] Choose the summary language
-- [ ] Captions-first strategy: uses existing captions when available, falling back to audio transcription
-- [ ] Speech-to-text via Groq Whisper, with automatic chunking for long videos
-- [ ] TL;DR + key points summary via Groq LLM (map-reduce for long transcripts)
-- [ ] Real-time progress updates (Server-Sent Events)
-- [ ] Copy summary or download it as Markdown
+- Paste a YouTube link (watch, short, Shorts, live or embed URL) and pick one of the
+  supported summary languages.
+- Uses the video's own captions when they exist and only falls back to downloading and
+  transcribing the audio (Groq Whisper) when they do not.
+- Summarizes into a TL;DR plus 3 to 10 key points with a Groq chat model, splitting long
+  transcripts into chunks so every request fits the free tier's per-minute token limit.
+- Shows live progress for each step (Server-Sent Events), with timings and request counters.
+- Copies the summary as Markdown or downloads it as a `.md` file.
+- Explains failures in plain words and offers "Try again" when waiting may help.
+- Light and dark themes, works on phones and without JavaScript.
+- A command-line mode that prints the summary as Markdown.
+- Runs only on your machine, with hardened defaults (see [Security](#security)).
+
+## Screenshots
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png">
+  <img src="docs/images/home-light.png" alt="Home page with a YouTube link pasted and English chosen as the summary language">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/progress-dark.png">
+  <img src="docs/images/progress-light.png" alt="Job page while the summary is being written, showing finished steps with their times and a request counter">
+</picture>
+
+<table>
+  <tr>
+    <td>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/result-dark.png">
+  <img src="docs/images/result-light.png" alt="Finished summary with a TL;DR, ten key points and Copy, Download .md and New video buttons" width="560">
+</picture>
+    </td>
+    <td>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/mobile-dark.png">
+  <img src="docs/images/mobile-light.png" alt="The same summary on a phone, with the buttons in a bar fixed to the bottom of the screen" width="240">
+</picture>
+    </td>
+  </tr>
+</table>
+
+The screenshots follow your GitHub theme. The video is
+["Lecture 1: Introduction to Individual Decision-Making"](https://www.youtube.com/watch?v=WRibE2nt8wM)
+by MIT OpenCourseWare ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)),
+57 minutes with captions, summarized in 72 seconds on Groq's free tier.
 
 ## How it works
 
-```
-YouTube URL ─► validate ─► captions? ──yes──────────────────────┐
-                              │                                 ▼
-                              no ─► download audio ─► transcribe ─► summarize ─► result
+```mermaid
+flowchart TB
+    url([YouTube link]) --> validate[Validate the link and rebuild a canonical URL]
+    validate --> check[Check the video: length and live status]
+    check --> captions{Usable captions?}
+    captions -- yes --> summarize
+    captions -- no --> audio[Download the audio and convert it with ffmpeg]
+    audio --> whisper[Transcribe with Groq Whisper]
+    whisper --> summarize[Summarize with Groq, in chunks if long]
+    summarize --> result([TL;DR + key points])
 ```
 
 ### Which captions are used
@@ -128,6 +173,48 @@ Accepted hosts: `youtube.com`, `www.youtube.com`, `m.youtube.com`, `youtu.be` an
 | AI | Groq API (Whisper for speech-to-text, GPT-OSS for summarization) |
 | Quality | Ruff, mypy (strict), pytest, pre-commit, poethepoet, GitHub Actions |
 | Security | Ruff security rules (Bandit), detect-secrets, pip-audit |
+
+## Architecture
+
+The code follows a lightweight ports-and-adapters layout: the pipeline only talks to
+interfaces declared in the domain, and the adapters behind them are the only code that
+touches yt-dlp, ffmpeg or Groq. That keeps the core testable without network access and
+makes a provider easy to swap.
+
+```mermaid
+flowchart TB
+    subgraph entry [Entry points]
+        web["web/: FastAPI, HTMX, live progress, job manager"]
+        cli["cli.py: command line"]
+    end
+    pipeline["services/: SummaryPipeline"]
+    subgraph domain [domain/: no I/O]
+        ports["Ports: VideoMetadataProvider, CaptionProvider, AudioProvider, Transcriber, Summarizer"]
+        rules["Models, errors, caption choice, eligibility, language allowlist"]
+    end
+    subgraph adapters [adapters/]
+        ytdlp["yt-dlp: metadata, captions, audio"]
+        ffmpeg["ffmpeg: convert and split audio"]
+        groq["Groq: Whisper and chat"]
+    end
+
+    web --> pipeline
+    cli --> pipeline
+    pipeline --> ports
+    pipeline --> rules
+    ports -. implemented by .-> ytdlp
+    ports -. implemented by .-> ffmpeg
+    ports -. implemented by .-> groq
+```
+
+| Package | Responsibility |
+|---|---|
+| `domain/` | Data models, errors with user-facing messages, ports (`Protocol`s) and pure rules. No I/O. |
+| `services/` | The pipeline that orchestrates the ports, progress text and the Markdown report. |
+| `adapters/` | yt-dlp, ffmpeg and Groq implementations of the ports. |
+| `web/` | FastAPI app, routes, background jobs, live progress and security middleware. |
+| `composition.py` | Wires the real adapters into the pipeline; the only place that knows all of them. |
+| `config.py` | Validated, immutable settings read from the environment and `.env`. |
 
 ## Prerequisites
 
