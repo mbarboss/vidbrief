@@ -23,10 +23,16 @@
 
 ## How it works
 
-```
-YouTube URL ─► validate ─► captions? ──yes──────────────────────┐
-                              │                                 ▼
-                              no ─► download audio ─► transcribe ─► summarize ─► result
+```mermaid
+flowchart TB
+    url([YouTube link]) --> validate[Validate the link and rebuild a canonical URL]
+    validate --> check[Check the video: length and live status]
+    check --> captions{Usable captions?}
+    captions -- yes --> summarize
+    captions -- no --> audio[Download the audio and convert it with ffmpeg]
+    audio --> whisper[Transcribe with Groq Whisper]
+    whisper --> summarize[Summarize with Groq, in chunks if long]
+    summarize --> result([TL;DR + key points])
 ```
 
 ### Which captions are used
@@ -133,6 +139,48 @@ Accepted hosts: `youtube.com`, `www.youtube.com`, `m.youtube.com`, `youtu.be` an
 | AI | Groq API (Whisper for speech-to-text, GPT-OSS for summarization) |
 | Quality | Ruff, mypy (strict), pytest, pre-commit, poethepoet, GitHub Actions |
 | Security | Ruff security rules (Bandit), detect-secrets, pip-audit |
+
+## Architecture
+
+The code follows a lightweight ports-and-adapters layout: the pipeline only talks to
+interfaces declared in the domain, and the adapters behind them are the only code that
+touches yt-dlp, ffmpeg or Groq. That keeps the core testable without network access and
+makes a provider easy to swap.
+
+```mermaid
+flowchart TB
+    subgraph entry [Entry points]
+        web["web/: FastAPI, HTMX, live progress, job manager"]
+        cli["cli.py: command line"]
+    end
+    pipeline["services/: SummaryPipeline"]
+    subgraph domain [domain/: no I/O]
+        ports["Ports: VideoMetadataProvider, CaptionProvider, AudioProvider, Transcriber, Summarizer"]
+        rules["Models, errors, caption choice, eligibility, language allowlist"]
+    end
+    subgraph adapters [adapters/]
+        ytdlp["yt-dlp: metadata, captions, audio"]
+        ffmpeg["ffmpeg: convert and split audio"]
+        groq["Groq: Whisper and chat"]
+    end
+
+    web --> pipeline
+    cli --> pipeline
+    pipeline --> ports
+    pipeline --> rules
+    ports -. implemented by .-> ytdlp
+    ports -. implemented by .-> ffmpeg
+    ports -. implemented by .-> groq
+```
+
+| Package | Responsibility |
+|---|---|
+| `domain/` | Data models, errors with user-facing messages, ports (`Protocol`s) and pure rules. No I/O. |
+| `services/` | The pipeline that orchestrates the ports, progress text and the Markdown report. |
+| `adapters/` | yt-dlp, ffmpeg and Groq implementations of the ports. |
+| `web/` | FastAPI app, routes, background jobs, live progress and security middleware. |
+| `composition.py` | Wires the real adapters into the pipeline; the only place that knows all of them. |
+| `config.py` | Validated, immutable settings read from the environment and `.env`. |
 
 ## Prerequisites
 
