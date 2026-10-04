@@ -21,6 +21,40 @@
 - A command-line mode that prints the summary as Markdown.
 - Runs only on your machine, with hardened defaults (see [Security](#security)).
 
+## Screenshots
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png">
+  <img src="docs/images/home-light.png" alt="Home page with a YouTube link pasted and English chosen as the summary language">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/progress-dark.png">
+  <img src="docs/images/progress-light.png" alt="Job page while the summary is being written, showing finished steps with their times and a request counter">
+</picture>
+
+<table>
+  <tr>
+    <td>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/result-dark.png">
+  <img src="docs/images/result-light.png" alt="Finished summary with a TL;DR, ten key points and Copy, Download .md and New video buttons" width="560">
+</picture>
+    </td>
+    <td>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/mobile-dark.png">
+  <img src="docs/images/mobile-light.png" alt="The same summary on a phone, with the buttons in a bar fixed to the bottom of the screen" width="240">
+</picture>
+    </td>
+  </tr>
+</table>
+
+The screenshots follow your GitHub theme. The video is
+["Lecture 1: Introduction to Individual Decision-Making"](https://www.youtube.com/watch?v=WRibE2nt8wM)
+by MIT OpenCourseWare ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)),
+57 minutes with captions, summarized in 72 seconds on Groq's free tier.
+
 ## How it works
 
 ```mermaid
