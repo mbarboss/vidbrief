@@ -4,17 +4,22 @@
 
 > Paste a YouTube link and get a concise AI-generated summary in your language.
 
-**Status:** 🚧 Work in progress (MVP under development)
+**Status:** feature-complete for local use (web app and command line).
 
-## Features (planned)
+## Features
 
-- [ ] Paste a YouTube URL and preview title, thumbnail and duration
-- [ ] Choose the summary language
-- [ ] Captions-first strategy: uses existing captions when available, falling back to audio transcription
-- [ ] Speech-to-text via Groq Whisper, with automatic chunking for long videos
-- [ ] TL;DR + key points summary via Groq LLM (map-reduce for long transcripts)
-- [ ] Real-time progress updates (Server-Sent Events)
-- [ ] Copy summary or download it as Markdown
+- Paste a YouTube link (watch, short, Shorts, live or embed URL) and pick one of the
+  supported summary languages.
+- Uses the video's own captions when they exist and only falls back to downloading and
+  transcribing the audio (Groq Whisper) when they do not.
+- Summarizes into a TL;DR plus 3 to 10 key points with a Groq chat model, splitting long
+  transcripts into chunks so every request fits the free tier's per-minute token limit.
+- Shows live progress for each step (Server-Sent Events), with timings and request counters.
+- Copies the summary as Markdown or downloads it as a `.md` file.
+- Explains failures in plain words and offers "Try again" when waiting may help.
+- Light and dark themes, works on phones and without JavaScript.
+- A command-line mode that prints the summary as Markdown.
+- Runs only on your machine, with hardened defaults (see [Security](#security)).
 
 ## How it works
 
