@@ -4,7 +4,8 @@
 
 > Paste a YouTube link and get a concise AI-generated summary in your language.
 
-**Status:** feature-complete for local use (web app and command line).
+**Status:** v0.1.0, feature-complete for local use (web app and command line). See the
+[changelog](CHANGELOG.md) for what each release brings.
 
 ## Features
 
