@@ -73,3 +73,39 @@ jobs:
         run: uv run poe test
       - name: Smoke test the command
         run: uv run vidbrief --help
+
+  docker:
+    name: Docker image (build and smoke test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image
+        run: docker build --tag vidbrief:ci .
+      # Starting at all means ffmpeg, ffprobe and Deno were found; the key is random because
+      # nothing here calls Groq.
+      - name: Start the container the way compose.yaml does
+        run: >-
+          docker run --detach --name vidbrief --read-only --tmpfs /tmp --cap-drop ALL
+          --security-opt no-new-privileges:true --publish 127.0.0.1:8000:8000
+          --env GROQ_API_KEY="gsk_$(openssl rand -hex 26)"
+          vidbrief:ci
+      - name: Wait until the container is healthy
+        run: |
+          for _ in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' vidbrief)
+            [ "$status" = healthy ] && exit 0
+            sleep 2
+          done
+          docker logs vidbrief
+          exit 1
+      - name: Check the published app
+        run: |
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/)" = 200
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: evil.example' http://127.0.0.1:8000/healthz)" = 400
+          test "$(docker exec vidbrief id -u)" = 10001
+      - name: Show the logs on failure
+        if: failure()
+        run: docker logs vidbrief
