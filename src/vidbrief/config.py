@@ -4,7 +4,7 @@ import ipaddress
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from vidbrief.domain.languages import SUPPORTED_SUMMARY_LANGUAGES
@@ -12,6 +12,7 @@ from vidbrief.domain.languages import SUPPORTED_SUMMARY_LANGUAGES
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 _LOOPBACK_HOSTNAMES = frozenset({"localhost"})
+ALL_INTERFACES = "0.0.0.0"  # noqa: S104
 
 
 class Settings(BaseSettings):
@@ -43,6 +44,8 @@ class Settings(BaseSettings):
     summary_max_request_tokens: int | None = Field(default=None, ge=2000, le=131_072)
     request_timeout_seconds: float = Field(default=120.0, gt=0)
     max_concurrent_jobs: int = Field(default=1, ge=1, le=4)
+    # Declared before ``host`` so the host validator can read it.
+    container: bool = False
     host: str = "127.0.0.1"
     port: int = Field(default=8000, ge=1024, le=65535)
     log_level: LogLevel = "INFO"
@@ -75,9 +78,14 @@ class Settings(BaseSettings):
 
     @field_validator("host")
     @classmethod
-    def _require_loopback_host(cls, value: str) -> str:
+    def _require_loopback_host(cls, value: str, info: ValidationInfo) -> str:
         # vidbrief is local-only: a routable interface would expose a pipeline billed to the
         # owner's Groq account to everyone on the network.
+        # Inside a container, published ports arrive on the container's own interface, not
+        # its loopback, so the server must listen on all of them; the image publishes the
+        # port on the host's 127.0.0.1 only, which keeps the app local.
+        if info.data.get("container") and value == ALL_INTERFACES:
+            return value
         if value in _LOOPBACK_HOSTNAMES:
             return value
         try:

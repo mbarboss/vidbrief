@@ -97,6 +97,24 @@ def test_allowed_hosts_follow_the_bind_address(
     assert allowed_hosts(make_settings(host=host)) == expected
 
 
+def test_binding_all_interfaces_still_accepts_only_loopback_names(
+    make_settings: SettingsFactory,
+) -> None:
+    settings = make_settings(container="true", host="0.0.0.0")
+
+    assert allowed_hosts(settings) == ["localhost", "127.0.0.1"]
+
+
+def test_binding_all_interfaces_rejects_the_container_address(
+    make_settings: SettingsFactory,
+) -> None:
+    app = create_app(make_settings(container="true", host="0.0.0.0"), UnusedRunner())
+
+    response = TestClient(app, base_url="http://0.0.0.0:8000").get("/healthz")
+
+    assert response.status_code == 400
+
+
 def test_ipv6_bind_address_accepts_its_bracketed_host(make_settings: SettingsFactory) -> None:
     app = create_app(make_settings(host="::1"), UnusedRunner())
 
