@@ -20,3 +20,14 @@ updates:
         patterns: ["*"]
     commit-message:
       prefix: build
+
+  # Base images are pinned by digest in the Dockerfile.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      docker-images:
+        patterns: ["*"]
+    commit-message:
+      prefix: build

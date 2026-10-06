@@ -1,0 +1,8 @@
+# Only what the image build copies; everything else, secrets above all, stays out.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!src/
+**/__pycache__/

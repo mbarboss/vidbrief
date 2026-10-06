@@ -20,6 +20,7 @@
 - Explains failures in plain words and offers "Try again" when waiting may help.
 - Light and dark themes, works on phones and without JavaScript.
 - A command-line mode that prints the summary as Markdown.
+- A Docker image with every tool bundled, published on your machine's loopback only.
 - Runs only on your machine, with hardened defaults (see [Security](#security)).
 
 ## Screenshots
@@ -237,6 +238,9 @@ vidbrief runs on Linux, macOS and Windows; every change is tested on all three b
 Open a new terminal afterwards so the tools are on your `PATH`. vidbrief checks for
 ffmpeg, ffprobe and Deno at startup and names whichever one is missing.
 
+With [Docker](https://docs.docker.com/get-started/get-docker/) you only need Docker and the
+Groq key; see [Run with Docker](#run-with-docker).
+
 ## Getting started
 
 ```bash
@@ -295,6 +299,44 @@ summarized, 2 for invalid arguments or configuration and 130 when cancelled with
 Errors are printed as `Error: <what went wrong>`, followed by a line with what to do when
 there is something to do.
 
+## Run with Docker
+
+The image bundles Python, ffmpeg and Deno, so nothing else has to be installed. After
+cloning and creating `.env` as in [Getting started](#getting-started):
+
+```bash
+docker compose up --build -d    # build and start in the background
+docker compose logs -f          # follow the logs
+docker compose down             # stop
+```
+
+Then open `http://localhost:8000`. The command line works too:
+
+```bash
+docker compose run --rm vidbrief vidbrief "https://youtu.be/jNQXAC9IVRw" --language pt-BR
+```
+
+Without compose, keep the same flags, in particular publishing on `127.0.0.1`:
+
+```bash
+docker build --tag vidbrief .
+docker run --rm --env-file .env --env VIDBRIEF_HOST=0.0.0.0 --env VIDBRIEF_PORT=8000 \
+  --publish 127.0.0.1:8000:8000 --read-only --tmpfs /tmp \
+  --cap-drop ALL --security-opt no-new-privileges:true vidbrief
+```
+
+Inside the container the server has to listen on all of the container's interfaces
+(`VIDBRIEF_CONTAINER=true`, `VIDBRIEF_HOST=0.0.0.0`), so publishing the port on
+`127.0.0.1` is what keeps it off your network. Never publish it as `8000:8000`: that would
+let anyone on the network spend your Groq quota. The `--env` flags (and `environment:` in
+`compose.yaml`) override a loopback `VIDBRIEF_HOST` from `.env`, which would make the server
+unreachable from outside the container.
+
+The image runs as an unprivileged user on a read-only filesystem with all capabilities
+dropped; downloads and caches live in `/tmp`, a 1 GB in-memory filesystem under compose.
+YouTube changes often break yt-dlp: when videos that used to work start failing, update
+yt-dlp (`uv lock --upgrade-package yt-dlp`) and rebuild with `docker compose up --build -d`.
+
 ## Configuration
 
 All settings are read from environment variables or `.env`. See [`.env.example`](.env.example).
@@ -310,7 +352,8 @@ All settings are read from environment variables or `.env`. See [`.env.example`]
 | `VIDBRIEF_SUMMARY_MAX_REQUEST_TOKENS` | — (automatic) | Fixed token budget (prompt + answer) per summary request, 2000 to 131072; unset follows the limit Groq reports |
 | `VIDBRIEF_REQUEST_TIMEOUT_SECONDS` | `120` | Timeout for external API calls |
 | `VIDBRIEF_MAX_CONCURRENT_JOBS` | `1` | Summaries that can run at once in the web server, 1 to 4 |
-| `VIDBRIEF_HOST` | `127.0.0.1` | Bind address (loopback only) |
+| `VIDBRIEF_HOST` | `127.0.0.1` | Bind address (loopback only, or `0.0.0.0` in container mode) |
+| `VIDBRIEF_CONTAINER` | `false` | Container mode, set by the Docker image: allows binding `0.0.0.0` |
 | `VIDBRIEF_PORT` | `8000` | HTTP port |
 | `VIDBRIEF_LOG_LEVEL` | `INFO` | Log verbosity |
 
@@ -346,7 +389,10 @@ quota and a few hundred chat tokens.
 
 ## Security
 
-- Runs locally only: the server refuses to bind to non-loopback addresses.
+- Runs locally only: the server refuses to bind to non-loopback addresses. The one
+  exception is container mode, which allows `0.0.0.0` (and nothing else) because Docker
+  delivers published ports to the container's own interface; the port is then published on
+  the host's `127.0.0.1` only, and the app still answers only to loopback host names.
 - Secrets are loaded from `.env` (git-ignored) and never logged: logs are structured JSON
   on stderr, and Groq API keys are masked as `[REDACTED]` in messages, extra fields
   (including values nested in objects) and tracebacks.
