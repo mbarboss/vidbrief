@@ -1,0 +1,25 @@
+services:
+  vidbrief:
+    build: .
+    image: vidbrief:local
+    # Published on the host's loopback only: the container listens on all of its own
+    # interfaces, so this mapping is what keeps the app off the network.
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - path: .env
+        required: true
+    # Wins over .env, whose loopback host is right outside the container but would make
+    # the server unreachable inside it.
+    environment:
+      VIDBRIEF_CONTAINER: "true"
+      VIDBRIEF_HOST: 0.0.0.0
+      VIDBRIEF_PORT: "8000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

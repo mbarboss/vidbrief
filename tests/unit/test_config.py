@@ -96,6 +96,26 @@ class TestHost:
         with pytest.raises(ValidationError, match="loopback"):
             make_settings(VIDBRIEF_HOST=host)
 
+    def test_container_mode_defaults_to_off(self, make_settings: SettingsFactory) -> None:
+        assert make_settings().container is False
+
+    def test_container_mode_accepts_all_interfaces(self, make_settings: SettingsFactory) -> None:
+        settings = make_settings(VIDBRIEF_CONTAINER="true", VIDBRIEF_HOST="0.0.0.0")
+
+        assert settings.host == "0.0.0.0"
+
+    def test_container_mode_still_accepts_loopback(self, make_settings: SettingsFactory) -> None:
+        settings = make_settings(VIDBRIEF_CONTAINER="true", VIDBRIEF_HOST="127.0.0.1")
+
+        assert settings.host == "127.0.0.1"
+
+    @pytest.mark.parametrize("host", ["::", "192.168.0.10", "172.17.0.2", "example.com"])
+    def test_container_mode_rejects_other_addresses(
+        self, make_settings: SettingsFactory, host: str
+    ) -> None:
+        with pytest.raises(ValidationError, match="loopback"):
+            make_settings(VIDBRIEF_CONTAINER="true", VIDBRIEF_HOST=host)
+
 
 class TestSummaryLanguage:
     @pytest.mark.parametrize("language", sorted(SUPPORTED_SUMMARY_LANGUAGES))

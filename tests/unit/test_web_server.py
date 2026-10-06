@@ -38,7 +38,8 @@ def test_runs_uvicorn_on_the_given_address_with_hardened_options() -> None:
         ("127.0.0.1", 8000, "http://127.0.0.1:8000"),
         ("localhost", 9000, "http://localhost:9000"),
         ("::1", 8000, "http://[::1]:8000"),
+        ("0.0.0.0", 8000, "http://localhost:8000"),
     ],
 )
-def test_server_url_brackets_ipv6_addresses(host: str, port: int, expected: str) -> None:
+def test_server_url_is_what_a_browser_opens(host: str, port: int, expected: str) -> None:
     assert server_url(host, port) == expected

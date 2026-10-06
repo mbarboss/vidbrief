@@ -7,6 +7,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-05
+
+### Added
+
+- Docker image with Python, ffmpeg and Deno bundled, plus a `compose.yaml` that publishes
+  the app on `127.0.0.1:8000` only and runs it as an unprivileged user on a read-only
+  filesystem with all capabilities dropped.
+- `VIDBRIEF_CONTAINER` setting: in container mode the server may bind `0.0.0.0`, which
+  Docker needs to deliver published ports; any other non-loopback address is still
+  refused, and only loopback host names are answered.
+- CI builds the image and checks that the container starts healthy, serves the home page,
+  rejects unknown host names and runs as a non-root user.
+- Dependabot proposes updates to the digest-pinned base images.
+
 ## [0.1.0] - 2026-10-05
 
 First release: summarize YouTube videos locally from the browser or the command line.
@@ -80,5 +94,6 @@ First release: summarize YouTube videos locally from the browser or the command 
   [#13](https://github.com/mbarboss/vidbrief/pull/13)).
 - Limits on concurrent and stored jobs ([#12](https://github.com/mbarboss/vidbrief/pull/12)).
 
-[Unreleased]: https://github.com/mbarboss/vidbrief/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mbarboss/vidbrief/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mbarboss/vidbrief/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mbarboss/vidbrief/releases/tag/v0.1.0

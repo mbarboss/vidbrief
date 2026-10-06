@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from vidbrief.config import Settings
+from vidbrief.config import ALL_INTERFACES, Settings
 from vidbrief.services.pipeline import SummaryRunner
 from vidbrief.web.csrf import CsrfProtector
 from vidbrief.web.jobs import JobManager
@@ -69,7 +69,10 @@ def allowed_hosts(settings: Settings) -> list[str]:
     """Host header values the app answers to.
 
     Accepting only loopback names stops DNS rebinding, where a malicious site points its
-    own domain at 127.0.0.1 to reach the app from the visitor's browser.
+    own domain at 127.0.0.1 to reach the app from the visitor's browser. In container mode
+    the bind address ``0.0.0.0`` is never a valid host name, so only those names remain.
     """
+    if settings.host == ALL_INTERFACES:
+        return list(_LOOPBACK_NAMES)
     host = url_host(settings.host)
     return [host, *(name for name in _LOOPBACK_NAMES if name != host)]

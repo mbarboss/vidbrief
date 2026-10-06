@@ -7,6 +7,8 @@ from typing import Protocol
 import uvicorn
 from starlette.types import ASGIApp
 
+from vidbrief.config import ALL_INTERFACES
+
 
 class Server(Protocol):
     def __call__(self, app: ASGIApp, *, host: str, port: int) -> None: ...
@@ -32,8 +34,11 @@ def run_server(
 
 
 def server_url(host: str, port: int) -> str:
-    """The address users open in their browser."""
-    return f"http://{url_host(host)}:{port}"
+    """The address users open in their browser.
+
+    A server listening on all interfaces (container mode) is reached through ``localhost``.
+    """
+    return f"http://{'localhost' if host == ALL_INTERFACES else url_host(host)}:{port}"
 
 
 def url_host(host: str) -> str:
