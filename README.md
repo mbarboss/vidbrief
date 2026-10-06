@@ -4,7 +4,7 @@
 
 > Paste a YouTube link and get a concise AI-generated summary in your language.
 
-**Status:** v0.1.0, feature-complete for local use (web app and command line). See the
+**Status:** v0.2.0, feature-complete for local use (web app, command line and Docker). See the
 [changelog](CHANGELOG.md) for what each release brings.
 
 ## Features
